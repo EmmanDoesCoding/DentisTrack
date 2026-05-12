@@ -7,8 +7,8 @@
 // ══════════════════════════════════════════════════
 //  ▼▼▼  PASTE YOUR JSONBIN CREDENTIALS HERE  ▼▼▼
 // ══════════════════════════════════════════════════
-const JSONBIN_ID  = 'YOUR_BIN_ID_HERE';   // e.g. '6650a1e2ad19ca34f8a1b2c3'
-const JSONBIN_KEY = 'YOUR_MASTER_KEY_HERE'; // e.g. '$2a$10$AbCdEf...'
+const JSONBIN_ID  = '6a031e81250b1311c33bc607';   // e.g. '6650a1e2ad19ca34f8a1b2c3'
+const JSONBIN_KEY = '$2a$10$6YUxFYON7tl.lHl13unwY.JY7BTEdnDYxnRzbS2pZriMdq5EdLEM2'; // e.g. '$2a$10$AbCdEf...'
 // ══════════════════════════════════════════════════
 //  ▲▲▲  PASTE YOUR JSONBIN CREDENTIALS HERE  ▲▲▲
 // ══════════════════════════════════════════════════
