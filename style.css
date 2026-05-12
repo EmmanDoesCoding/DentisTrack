@@ -352,6 +352,22 @@ body{font-family:var(--fb);background:var(--cream);color:var(--navy);min-height:
 .b-done{background:var(--teal-xlt);color:var(--teal-dk)}
 .b-skipped{background:var(--danger-bg);color:var(--danger)}
 
+/* Last patient today indicator */
+.last-patient-card{
+  border:2px solid rgba(232,184,75,.4)!important;
+  background:linear-gradient(to right,var(--white),#fffdf0)!important;
+}
+.q-last-tag{
+  font-size:.66rem;font-weight:700;letter-spacing:.07em;
+  color:var(--gold);text-transform:uppercase;margin-bottom:2px;
+}
+/* Future date card — slightly muted */
+.future-card{opacity:.82;border-style:dashed!important}
+.q-future-tag{
+  font-size:.66rem;font-weight:700;letter-spacing:.06em;
+  color:var(--teal-lt);text-transform:uppercase;margin-bottom:2px;
+}
+
 .empty-state{text-align:center;padding:50px 14px;color:var(--muted)}
 .empty-state .ei{font-size:2.7rem;display:block;margin-bottom:11px;opacity:.38}
 .empty-state h3{font-family:var(--fd);font-size:1.25rem;color:var(--slate);margin-bottom:4px}

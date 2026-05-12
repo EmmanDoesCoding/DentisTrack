@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════
-   DentisTrack — app.js  v5
+   CliniQ — app.js  v6
    JSONBin real-time sync + localStorage fallback
 ═══════════════════════════════════════════════ */
 'use strict';
@@ -7,8 +7,8 @@
 // ══════════════════════════════════════════════════
 //  ▼▼▼  PASTE YOUR JSONBIN CREDENTIALS HERE  ▼▼▼
 // ══════════════════════════════════════════════════
-const JSONBIN_ID  = '6a031e81250b1311c33bc607';   // e.g. '6650a1e2ad19ca34f8a1b2c3'
-const JSONBIN_KEY = '$2a$10$6YUxFYON7tl.lHl13unwY.JY7BTEdnDYxnRzbS2pZriMdq5EdLEM2'; // e.g. '$2a$10$AbCdEf...'
+const JSONBIN_ID  = 'YOUR_BIN_ID_HERE';   // e.g. '6650a1e2ad19ca34f8a1b2c3'
+const JSONBIN_KEY = 'YOUR_MASTER_KEY_HERE'; // e.g. '$2a$10$AbCdEf...'
 // ══════════════════════════════════════════════════
 //  ▲▲▲  PASTE YOUR JSONBIN CREDENTIALS HERE  ▲▲▲
 // ══════════════════════════════════════════════════
@@ -31,7 +31,7 @@ const SERVICES = [
 
 const ADMIN_CREDS  = { username:'admin', password:'dentis2024' };
 const CLINIC_OPEN  = 8;
-const CLINIC_CLOSE = 18;
+const CLINIC_CLOSE = 16;  // 4 PM closing time
 
 // localStorage fallback keys
 const LS = {
@@ -767,19 +767,29 @@ function updateNavBadges() {
 function renderQueueTab() {
   const el = document.getElementById('queue-list'); if (!el) return;
   if (S.queue.length===0) { el.innerHTML=emptyState('📋','No patients in queue','Patients will appear here after check-in.'); return; }
+
+  // Find index of last patient scheduled for TODAY (for last-patient indicator)
+  const today = new Date().toISOString().split('T')[0];
+  const todayWaiting = S.queue.filter(p=>p.status==='waiting'&&p.date===today);
+  const lastTodayId  = todayWaiting.length > 0 ? todayWaiting[todayWaiting.length-1].id : null;
+
   el.innerHTML = S.queue.map((p,i) => {
-    const isNext = i===0&&p.status==='waiting';
-    const amt    = p.hasVar?`₱${p.total.toLocaleString()}+`:`₱${p.total.toLocaleString()}`;
-    const bc     = p.skipped?'b-skipped':p.paid?'b-paid':'b-waiting';
-    const bt     = p.skipped?'Skipped':p.paid?'Paid ✓':'Waiting';
+    const isNext   = i===0&&p.status==='waiting';
+    const isLast   = p.id===lastTodayId && !p.skipped;
+    const amt      = p.hasVar?`₱${p.total.toLocaleString()}+`:`₱${p.total.toLocaleString()}`;
+    const bc       = p.skipped?'b-skipped':p.paid?'b-paid':'b-waiting';
+    const bt       = p.skipped?'Skipped':p.paid?'Paid ✓':'Waiting';
+    const isFuture = p.date !== today;
     return `
-    <div class="q-card" id="qc-${p.id}">
+    <div class="q-card ${isLast?'last-patient-card':''} ${isFuture?'future-card':''}" id="qc-${p.id}">
       <div class="q-num ${isNext?'is-next':''}">${p.skipped?'↩':i+1}</div>
       <div class="q-info">
         ${isNext?'<div class="q-next-tag">⚡ Next Up</div>':''}
+        ${isLast?'<div class="q-last-tag">🔚 Last Patient Today</div>':''}
+        ${isFuture?`<div class="q-future-tag">📅 ${formatDate(p.date)}</div>`:''}
         <div class="q-name">${esc(p.name)}</div>
         <div class="q-svcs">${p.svcs.map(s=>`${s.icon} ${s.name}`).join(' · ')}</div>
-        <div class="q-meta">📅 ${formatDate(p.date)} · ⏰ ${formatTime(p.time)} · ⏱ ${durLabel(p.durMin,p.durMax)}</div>
+        <div class="q-meta">⏰ ${formatTime(p.time)} · ⏱ ${durLabel(p.durMin,p.durMax)}</div>
         <div class="q-meta">📞 ${esc(p.contact)}</div>
       </div>
       <div class="q-right">
@@ -1002,8 +1012,8 @@ function openReceipt(id, fromCompleted=false) {
   const tt  = p.hasVar ? `₱${p.total.toLocaleString()}+ (est.)` : `₱${p.total.toLocaleString()}`;
   document.getElementById('receipt-content').innerHTML = `
     <div class="receipt-header">
-      <div class="receipt-logo">🦷 DentisTrack</div>
-      <div class="receipt-sub">Dental Clinic Management System</div>
+      <div class="receipt-logo">🦷 CliniQ</div>
+      <div class="receipt-sub">Smart Dental Queue Management</div>
       <div class="receipt-sub">Printed: ${now.toLocaleDateString('en-PH',{year:'numeric',month:'long',day:'numeric'})} at ${now.toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'})}</div>
       <div class="receipt-id">Receipt #${rNo}</div>
     </div>
@@ -1020,7 +1030,7 @@ function openReceipt(id, fromCompleted=false) {
     </div>
     <div class="receipt-total-row"><span>TOTAL</span><span>${tt}</span></div>
     ${p.hasVar?`<p style="font-size:.69rem;color:var(--muted);text-align:right;margin-top:3px">*Final amount may vary.</p>`:''}
-    <div class="receipt-footer">Thank you for choosing DentisTrack!<br/>Present this receipt at the front desk.<br/>Keep this copy for your records.</div>`;
+    <div class="receipt-footer">Thank you for choosing CliniQ!<br/>Present this receipt at the front desk.<br/>Keep this copy for your records.</div>`;
   document.getElementById('receipt-overlay').classList.add('open');
 }
 function closeReceipt() { document.getElementById('receipt-overlay').classList.remove('open'); }
@@ -1038,27 +1048,222 @@ function openQueueBoard() {
 function broadcastToBoard() { /* board auto-polls every 5s */ }
 
 function renderBoardInWindow(win) {
-  const waiting  = S.queue.filter(p=>p.status==='waiting');
-  const next     = waiting[0]; const upcoming = waiting.slice(1,6);
+  const today   = new Date().toISOString().split('T')[0];
+  // Only show today's waiting patients on the board, up to 10
+  const waiting = S.queue.filter(p => p.status==='waiting' && p.date===today).slice(0, 10);
+  const next     = waiting[0];
+  const upcoming = waiting.slice(1, 10);
   const now      = new Date().toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'});
   const dc = {available:'#27ae60',busy:'#e67e22',unavailable:'#e05757'}[S.dentistStatus];
   const dl = {available:'🟢 Dentist Available',busy:'🟡 Dentist With Patient',unavailable:'🔴 Dentist Unavailable'}[S.dentistStatus];
+
+  // Build upcoming rows — last one in today's list gets a 🔚 tag
+  const upcomingRows = upcoming.map((p,i) => {
+    const isLast = i === upcoming.length - 1 && waiting.length > 1;
+    return `<div class="ui ${isLast?'ui-last':''}">
+      <div class="un">${i+2}</div>
+      <div class="uinfo">
+        <div class="uname">${esc(p.name)} ${isLast?'<span class="last-lbl">🔚 Last</span>':''}</div>
+        <div class="usvcs">${p.svcs.map(s=>s.name).join(', ')}</div>
+      </div>
+      <div class="utime">${formatTime(p.time)}</div>
+    </div>`;
+  }).join('');
+
   win.document.open();
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>DentisTrack Queue</title>
+  win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>CliniQ — Queue Board</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,400;9..40,600;9..40,700&display=swap" rel="stylesheet"/>
-<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'DM Sans',sans-serif;background:#0d2b26;color:#fff;height:100vh;display:flex;flex-direction:column;overflow:hidden}.bh{display:flex;align-items:center;justify-content:space-between;padding:16px 34px;background:rgba(0,0,0,.2);border-bottom:1px solid rgba(255,255,255,.07)}.bl{font-family:'DM Serif Display',serif;font-size:1.65rem;display:flex;align-items:center;gap:11px}.bt{font-size:.95rem;color:rgba(255,255,255,.42)}.bb{flex:1;display:grid;grid-template-columns:1.4fr 1fr;overflow:hidden}.bl-l{padding:26px 34px;display:flex;flex-direction:column;border-right:1px solid rgba(255,255,255,.06)}.bl-r{padding:26px 30px;background:rgba(0,0,0,.12);overflow-y:auto}.sl{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.28);margin-bottom:16px}.cc{background:linear-gradient(135deg,#1a8a78,#126b5e);border-radius:20px;padding:26px;flex:1;display:flex;flex-direction:column;justify-content:center;box-shadow:0 16px 48px rgba(26,138,120,.28)}.cn{font-family:'DM Serif Display',serif;font-size:4rem;color:rgba(255,255,255,.13);line-height:1;margin-bottom:3px}.cname{font-family:'DM Serif Display',serif;font-size:2.2rem;color:#fff;margin-bottom:7px;line-height:1.2}.csvcs{font-size:.92rem;color:rgba(255,255,255,.58);margin-bottom:12px}.cmeta{font-size:.82rem;color:rgba(255,255,255,.36)}.ec{font-family:'DM Serif Display',serif;font-size:1.4rem;color:rgba(255,255,255,.2);text-align:center;margin:auto}.ui{display:flex;align-items:center;gap:13px;padding:11px 13px;border-radius:12px;background:rgba(255,255,255,.05);margin-bottom:8px}.un{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-family:'DM Serif Display',serif;font-size:.9rem;color:rgba(255,255,255,.5);flex-shrink:0}.uinfo{flex:1;min-width:0}.uname{font-weight:600;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.usvcs{font-size:.73rem;color:rgba(255,255,255,.36);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.utime{font-size:.76rem;color:rgba(255,255,255,.36);flex-shrink:0}.bf{padding:11px 34px;background:rgba(0,0,0,.22);display:flex;align-items:center;justify-content:space-between;border-top:1px solid rgba(255,255,255,.05)}.ds{display:flex;align-items:center;gap:8px;font-size:.86rem;font-weight:600;color:${dc}}.dot{width:10px;height:10px;border-radius:50%;background:${dc}}.bfr{font-size:.71rem;color:rgba(255,255,255,.2)}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}.nl{display:inline-block;background:rgba(255,255,255,.16);color:#fff;padding:3px 11px;border-radius:999px;font-size:.73rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:11px;animation:pulse 2s ease-in-out infinite}</style></head><body>
-<div class="bh"><div class="bl">🦷 DentisTrack — Queue Display</div><div class="bt">🕐 ${now}</div></div>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;width:100%}
+  body{
+    font-family:'DM Sans',sans-serif;
+    background:#0d2b26;color:#fff;
+    min-height:100vh;display:flex;flex-direction:column;
+    overflow-x:hidden;
+  }
+
+  /* ── Header ── */
+  .bh{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 28px;background:rgba(0,0,0,.25);
+    border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0;
+  }
+  .bl{font-family:'DM Serif Display',serif;font-size:clamp(1.2rem,3vw,1.7rem);display:flex;align-items:center;gap:10px}
+  .bt{font-size:clamp(.85rem,2vw,1.05rem);color:rgba(255,255,255,.45);font-weight:600}
+
+  /* ── Body — side by side on desktop, stacked on mobile ── */
+  .bb{
+    flex:1;display:grid;
+    grid-template-columns:1.4fr 1fr;
+    overflow:hidden;
+    min-height:0;
+  }
+  .bl-l{
+    padding:clamp(16px,3vw,32px) clamp(16px,3vw,36px);
+    display:flex;flex-direction:column;
+    border-right:1px solid rgba(255,255,255,.06);
+    overflow:hidden;
+  }
+  .bl-r{
+    padding:clamp(14px,2.5vw,28px) clamp(14px,2.5vw,30px);
+    background:rgba(0,0,0,.12);overflow-y:auto;
+  }
+
+  /* ── Section label ── */
+  .sl{
+    font-size:clamp(.6rem,1.2vw,.75rem);font-weight:700;text-transform:uppercase;
+    letter-spacing:.1em;color:rgba(255,255,255,.3);margin-bottom:clamp(10px,2vw,18px);
+  }
+
+  /* ── Now Serving card ── */
+  .cc{
+    background:linear-gradient(135deg,#1a8a78,#126b5e);
+    border-radius:clamp(14px,2vw,22px);
+    padding:clamp(18px,3vw,32px);
+    flex:1;display:flex;flex-direction:column;justify-content:center;
+    box-shadow:0 16px 48px rgba(26,138,120,.3);
+    overflow:hidden;
+  }
+  .nl{
+    display:inline-block;background:rgba(255,255,255,.18);color:#fff;
+    padding:4px 14px;border-radius:999px;
+    font-size:clamp(.7rem,1.5vw,.85rem);font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+    margin-bottom:clamp(8px,1.5vw,16px);
+    animation:pulse 2s ease-in-out infinite;
+  }
+  /* BIG ⚡ emoji */
+  .ns-icon{
+    font-size:clamp(3rem,8vw,7rem);
+    display:block;line-height:1;margin-bottom:clamp(4px,1vw,10px);
+    animation:pulse 2s ease-in-out infinite;
+  }
+  /* BIG name */
+  .cname{
+    font-family:'DM Serif Display',serif;
+    font-size:clamp(1.8rem,5.5vw,4.5rem);
+    color:#fff;margin-bottom:clamp(6px,1.2vw,14px);line-height:1.15;
+    word-break:break-word;
+  }
+  .csvcs{
+    font-size:clamp(.78rem,1.8vw,1.05rem);
+    color:rgba(255,255,255,.6);margin-bottom:clamp(8px,1.5vw,16px);
+  }
+  /* BIG time */
+  .cmeta{
+    font-size:clamp(1rem,2.5vw,1.8rem);
+    color:rgba(255,255,255,.5);font-weight:600;
+  }
+  .ec{
+    font-family:'DM Serif Display',serif;
+    font-size:clamp(1.1rem,3vw,1.6rem);
+    color:rgba(255,255,255,.2);text-align:center;margin:auto;
+  }
+
+  /* ── Upcoming rows ── */
+  .ui{
+    display:flex;align-items:center;gap:clamp(8px,1.5vw,14px);
+    padding:clamp(9px,1.5vw,13px) clamp(10px,1.5vw,14px);
+    border-radius:clamp(8px,1.5vw,13px);
+    background:rgba(255,255,255,.05);margin-bottom:clamp(6px,1vw,9px);
+    transition:.2s;
+  }
+  .ui-last{border:1.5px solid rgba(255,184,75,.3);background:rgba(255,184,75,.07)}
+  .un{
+    width:clamp(28px,4vw,38px);height:clamp(28px,4vw,38px);
+    border-radius:50%;background:rgba(255,255,255,.1);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'DM Serif Display',serif;
+    font-size:clamp(.8rem,1.5vw,1rem);color:rgba(255,255,255,.55);flex-shrink:0;
+  }
+  .uinfo{flex:1;min-width:0}
+  .uname{
+    font-weight:600;font-size:clamp(.82rem,1.8vw,1rem);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    display:flex;align-items:center;gap:6px;
+  }
+  .last-lbl{
+    background:rgba(255,184,75,.25);color:#e8b84b;
+    font-size:clamp(.6rem,1.2vw,.72rem);font-weight:700;
+    padding:2px 7px;border-radius:999px;white-space:nowrap;flex-shrink:0;
+  }
+  .usvcs{
+    font-size:clamp(.68rem,1.3vw,.8rem);color:rgba(255,255,255,.38);
+    margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .utime{font-size:clamp(.72rem,1.4vw,.85rem);color:rgba(255,255,255,.4);flex-shrink:0;font-weight:600}
+
+  /* ── Footer ── */
+  .bf{
+    padding:clamp(8px,1.5vw,12px) clamp(16px,3vw,34px);
+    background:rgba(0,0,0,.25);
+    display:flex;align-items:center;justify-content:space-between;
+    border-top:1px solid rgba(255,255,255,.05);flex-shrink:0;flex-wrap:wrap;gap:8px;
+  }
+  .ds{display:flex;align-items:center;gap:8px;font-size:clamp(.78rem,1.6vw,.92rem);font-weight:600;color:${dc}}
+  .dot{width:10px;height:10px;border-radius:50%;background:${dc};flex-shrink:0}
+  .bfr{font-size:clamp(.62rem,1.2vw,.74rem);color:rgba(255,255,255,.2)}
+
+  /* ── Animations ── */
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
+
+  /* ── MOBILE: stack vertically ── */
+  @media(max-width:640px){
+    .bb{grid-template-columns:1fr;grid-template-rows:auto auto;overflow:visible}
+    .bl-l{border-right:none;border-bottom:1px solid rgba(255,255,255,.07);max-height:55vh}
+    .bl-r{max-height:35vh;overflow-y:auto}
+    .cc{min-height:160px}
+  }
+</style>
+</head>
+<body>
+
+<div class="bh">
+  <div class="bl">🦷 CliniQ — Queue Display</div>
+  <div class="bt">🕐 ${now}</div>
+</div>
+
 <div class="bb">
-  <div class="bl-l"><div class="sl">Now Serving</div>
-    ${next?`<div class="cc"><div class="nl">⚡ Now Serving</div><div class="cn">#1</div><div class="cname">${esc(next.name)}</div><div class="csvcs">${next.svcs.map(s=>`${s.icon} ${s.name}`).join(' · ')}</div><div class="cmeta">📅 ${formatDate(next.date)} · ⏰ ${formatTime(next.time)}</div></div>`:`<div class="cc"><div class="ec">No patients in queue</div></div>`}
+  <div class="bl-l">
+    <div class="sl">Now Serving</div>
+    ${next
+      ? `<div class="cc">
+          <div class="nl">Now Serving</div>
+          <span class="ns-icon">⚡</span>
+          <div class="cname">${esc(next.name)}</div>
+          <div class="csvcs">${next.svcs.map(s=>`${s.icon} ${s.name}`).join('  ·  ')}</div>
+          <div class="cmeta">⏰ ${formatTime(next.time)}</div>
+        </div>`
+      : `<div class="cc"><div class="ec">No patients scheduled today</div></div>`
+    }
   </div>
-  <div class="bl-r"><div class="sl">Up Next</div>
-    ${upcoming.length===0?'<p style="color:rgba(255,255,255,.2);font-size:.87rem">No upcoming patients.</p>':upcoming.map((p,i)=>`<div class="ui"><div class="un">${i+2}</div><div class="uinfo"><div class="uname">${esc(p.name)}</div><div class="usvcs">${p.svcs.map(s=>s.name).join(', ')}</div></div><div class="utime">${formatTime(p.time)}</div></div>`).join('')}
+
+  <div class="bl-r">
+    <div class="sl">Up Next Today${waiting.length>1?` (${waiting.length-1} remaining)`:''}</div>
+    ${upcoming.length===0
+      ? '<p style="color:rgba(255,255,255,.22);font-size:.87rem">No more patients today.</p>'
+      : upcomingRows
+    }
   </div>
 </div>
-<div class="bf"><div class="ds"><div class="dot"></div>${dl}</div><div class="bfr">Auto-refreshes every 5s · DentisTrack v5 · Live Sync</div></div>
-<script>function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}function formatDate(d){if(!d)return'';return new Date(d+'T00:00:00').toLocaleDateString('en-PH',{year:'numeric',month:'short',day:'numeric'})}function formatTime(t){if(!t)return'';const[h,m]=t.split(':').map(Number);return(h%12||12)+':'+String(m).padStart(2,'0')+' '+(h>=12?'PM':'AM')}<\/script>
-</body></html>`);
+
+<div class="bf">
+  <div class="ds"><div class="dot"></div>${dl}</div>
+  <div class="bfr">Showing today's queue only · Auto-refreshes every 5s · CliniQ v6</div>
+</div>
+
+<script>
+  function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+  function formatDate(d){if(!d)return'';return new Date(d+'T00:00:00').toLocaleDateString('en-PH',{year:'numeric',month:'short',day:'numeric'})}
+  function formatTime(t){if(!t)return'';const[h,m]=t.split(':').map(Number);return(h%12||12)+':'+String(m).padStart(2,'0')+' '+(h>=12?'PM':'AM')}
+<\/script>
+</body>
+</html>`);
   win.document.close();
 }
 
