@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+  <title>DentisTrack</title>
+  <link rel="stylesheet" href="style.css"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet"/>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════
+     LANDING
+══════════════════════════════════════════ -->
+<div id="page-landing" class="page active">
+  <div class="landing-bg">
+    <div class="tooth-bg">🦷</div>
+    <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+  </div>
+  <div class="landing-content">
+    <div class="landing-logo">
+      <span class="logo-mark">🦷</span>
+      <div>
+        <h1 class="logo-name">DentisTrack</h1>
+        <p class="logo-tagline">Smart Dental Queue System</p>
+      </div>
+    </div>
+    <h2 class="landing-headline">Your Smile,<br/><em>Our Priority.</em></h2>
+    <p class="landing-desc">Book your slot, choose your service, and we'll be ready when you arrive.</p>
+    <div class="landing-ctas">
+      <button class="btn btn-primary btn-lg" onclick="showPage('page-patient-portal')">
+        <span>👤</span> Patient Portal
+      </button>
+      <button class="btn btn-ghost btn-lg" onclick="showPage('page-admin-login')">
+        <span>🔒</span> Staff Login
+      </button>
+      <button class="btn btn-ghost btn-lg" onclick="openQueueBoard()">
+        <span>📺</span> Queue Board
+      </button>
+    </div>
+    <p class="landing-hours">Mon – Sat &nbsp;·&nbsp; 8:00 AM – 6:00 PM</p>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     PATIENT PORTAL (login / register chooser)
+══════════════════════════════════════════ -->
+<div id="page-patient-portal" class="page">
+  <div class="auth-wrap">
+    <button class="back-btn" onclick="showPage('page-landing')">← Back</button>
+    <div class="auth-card">
+      <span class="auth-emoji">🦷</span>
+      <h2 class="auth-title">Patient Portal</h2>
+      <p class="auth-sub">Sign in to manage your appointments, or register as a new patient.</p>
+
+      <div class="portal-tabs">
+        <button class="ptab active" id="ptab-signin" onclick="switchPortalTab('signin')">Sign In</button>
+        <button class="ptab"        id="ptab-register" onclick="switchPortalTab('register')">New Patient</button>
+      </div>
+
+      <!-- SIGN IN -->
+      <div id="portal-signin">
+        <div class="form-group">
+          <label>Contact Number</label>
+          <input type="tel" id="si-contact" placeholder="09XXXXXXXXX" autocomplete="off"
+                 onkeydown="if(event.key==='Enter')patientSignIn()"/>
+        </div>
+        <div class="form-group">
+          <label>Full Name <span class="label-hint">(for verification)</span></label>
+          <input type="text" id="si-name" placeholder="e.g. Maria Santos" autocomplete="off"
+                 onkeydown="if(event.key==='Enter')patientSignIn()"/>
+        </div>
+        <p class="auth-error" id="si-err"></p>
+        <button class="btn btn-primary btn-full" onclick="patientSignIn()">Sign In</button>
+      </div>
+
+      <!-- REGISTER -->
+      <div id="portal-register" style="display:none">
+        <div class="form-row-2">
+          <div class="form-group">
+            <label>Full Name</label>
+            <input type="text" id="reg-name" placeholder="e.g. Maria Santos" autocomplete="off"/>
+          </div>
+          <div class="form-group">
+            <label>Contact Number</label>
+            <input type="tel" id="reg-contact" placeholder="09XXXXXXXXX"/>
+          </div>
+        </div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label>Age</label>
+            <input type="text" id="reg-age" placeholder="e.g. 28"/>
+          </div>
+          <div class="form-group">
+            <label>Gender</label>
+            <select id="reg-gender">
+              <option value="">— Select —</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+              <option value="Prefer not to say">Prefer not to say</option>
+            </select>
+          </div>
+        </div>
+        <p class="auth-error" id="reg-err"></p>
+        <button class="btn btn-primary btn-full" onclick="patientRegister()">Create Account</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     PATIENT DASHBOARD (after login)
+══════════════════════════════════════════ -->
+<div id="page-patient-dashboard" class="page">
+  <div class="auth-wrap wide">
+    <div class="patient-dash-header">
+      <div>
+        <h2 class="auth-title" id="pd-greeting">Hello!</h2>
+        <p class="auth-sub" id="pd-sub">Manage your appointments below.</p>
+      </div>
+      <button class="btn btn-sm btn-outline" onclick="patientLogout()">Sign Out</button>
+    </div>
+
+    <div class="dentist-banner" id="pd-dentist-banner"></div>
+
+    <!-- Active appointment card -->
+    <div id="pd-active-appt"></div>
+
+    <!-- Tabs -->
+    <div class="pd-tabs">
+      <button class="pd-tab active" id="pdt-book"    onclick="switchPdTab('book')">📅 Book Appointment</button>
+      <button class="pd-tab"        id="pdt-history" onclick="switchPdTab('history')">🕐 My History</button>
+    </div>
+
+    <!-- BOOK TAB -->
+    <div id="pdt-book-panel" class="pd-panel">
+      <div class="auth-card" style="box-shadow:none;border:1.5px solid var(--mint);padding:22px 18px">
+
+        <div class="form-group">
+          <label>Select Services <span class="label-hint">(pick first, then date)</span></label>
+          <div class="services-grid" id="pd-services-grid"></div>
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label>Preferred Date</label>
+            <input type="date" id="pd-date" onchange="refreshTimeSlots()"/>
+          </div>
+          <div class="form-group">
+            <label>Available Time Slot</label>
+            <select id="pd-time">
+              <option value="">— Select services &amp; date first —</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="slot-info" id="pd-slot-info"></div>
+
+        <div class="bill-box">
+          <div class="bill-row"><span>Services Selected</span><span id="pd-b-count">0</span></div>
+          <div class="bill-row"><span>Est. Duration</span><span id="pd-b-dur">—</span></div>
+          <div class="bill-divider"></div>
+          <div class="bill-row bill-total"><span>Estimated Total</span><span id="pd-b-total">₱0</span></div>
+          <p class="bill-note" id="pd-b-note"></p>
+        </div>
+
+        <button class="btn btn-primary btn-full" onclick="patientJoinQueue()">Join Queue 🦷</button>
+      </div>
+    </div>
+
+    <!-- HISTORY TAB -->
+    <div id="pdt-history-panel" class="pd-panel" style="display:none">
+      <div id="pd-history-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     PATIENT CONFIRM
+══════════════════════════════════════════ -->
+<div id="page-patient-confirm" class="page">
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <span class="confirm-anim">✅</span>
+      <h2 class="auth-title" style="text-align:center">You're in the Queue!</h2>
+      <div id="confirm-body"></div>
+      <div class="notif-panel">
+        <div class="notif-title">📲 Smart Notifications</div>
+        <p class="notif-sub">We'll alert you when it's almost your turn.</p>
+        <div class="notif-log" id="notif-log"></div>
+      </div>
+      <div class="confirm-tip">
+        💡 <strong>Tip:</strong> Sign back in to the Patient Portal anytime to check your queue position.
+      </div>
+      <button class="btn btn-primary btn-full" onclick="showPage('page-patient-dashboard')" style="margin-top:16px">Back to My Dashboard</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     ADMIN LOGIN
+══════════════════════════════════════════ -->
+<div id="page-admin-login" class="page">
+  <div class="auth-wrap">
+    <button class="back-btn" onclick="showPage('page-landing')">← Back</button>
+    <div class="auth-card">
+      <span class="auth-emoji">🔐</span>
+      <h2 class="auth-title">Staff Portal</h2>
+      <p class="auth-sub">Authorized personnel only.</p>
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" id="a-user" placeholder="admin" autocomplete="off"/>
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="a-pass" placeholder="••••••••"
+               onkeydown="if(event.key==='Enter')adminLogin()"/>
+      </div>
+      <p class="auth-error" id="a-err"></p>
+      <button class="btn btn-primary btn-full" onclick="adminLogin()">Sign In</button>
+      <p class="auth-hint">Demo: <strong>admin</strong> / <strong>dentis2024</strong></p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     ADMIN DASHBOARD
+══════════════════════════════════════════ -->
+<div id="page-admin-dashboard" class="page dash-layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-top">
+      <div class="sidebar-logo"><span>🦷</span><span>DentisTrack</span></div>
+      <button class="sidebar-close" onclick="closeSidebar()">✕</button>
+    </div>
+    <nav class="sidebar-nav">
+      <button class="nav-item active" data-tab="tab-queue" onclick="switchTab(this,'tab-queue')">
+        <span class="ni-icon">📋</span><span>Queue</span>
+        <span class="nav-badge" id="nb-queue">0</span>
+      </button>
+      <button class="nav-item" data-tab="tab-completed" onclick="switchTab(this,'tab-completed')">
+        <span class="ni-icon">✅</span><span>Completed</span>
+        <span class="nav-badge" id="nb-done">0</span>
+      </button>
+      <button class="nav-item" data-tab="tab-history" onclick="switchTab(this,'tab-history')">
+        <span class="ni-icon">📅</span><span>History Log</span>
+      </button>
+      <button class="nav-item" data-tab="tab-revenue" onclick="switchTab(this,'tab-revenue')">
+        <span class="ni-icon">💰</span><span>Revenue</span>
+      </button>
+      <button class="nav-item" data-tab="tab-dentist" onclick="switchTab(this,'tab-dentist')">
+        <span class="ni-icon">👨‍⚕️</span><span>Dentist</span>
+      </button>
+    </nav>
+    <div class="sidebar-bottom">
+      <button class="btn-board" onclick="openQueueBoard()">📺 Queue Board</button>
+      <button class="sidebar-logout" onclick="adminLogout()">⬅ Logout</button>
+    </div>
+  </aside>
+
+  <main class="dash-main">
+    <header class="dash-header">
+      <div class="dash-hdr-left">
+        <button class="menu-btn" onclick="openSidebar()">☰</button>
+        <div>
+          <h2 class="dash-title" id="dash-title">Queue Management</h2>
+          <p class="dash-sub"   id="dash-sub">Active patients sorted by appointment time</p>
+        </div>
+      </div>
+      <div class="dash-chips" id="dash-chips"></div>
+    </header>
+
+    <div id="tab-queue"     class="tab active"><div class="queue-list" id="queue-list"></div></div>
+    <div id="tab-completed" class="tab">       <div class="queue-list" id="completed-list"></div></div>
+    <div id="tab-history"   class="tab">       <div class="history-wrap" id="history-wrap"></div></div>
+    <div id="tab-revenue"   class="tab">       <div class="rev-grid" id="rev-grid"></div></div>
+    <div id="tab-dentist"   class="tab">       <div class="dentist-mgr" id="dentist-mgr"></div></div>
+  </main>
+</div>
+
+<!-- RECEIPT MODAL -->
+<div class="modal-overlay" id="receipt-overlay" onclick="closeReceiptOnBg(event)">
+  <div class="modal-box">
+    <div id="receipt-content"></div>
+    <div class="receipt-btns no-print">
+      <button class="btn btn-primary" onclick="window.print()">🖨️ Print</button>
+      <button class="btn btn-outline" onclick="closeReceipt()">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="sb-overlay" id="sb-overlay" onclick="closeSidebar()"></div>
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
