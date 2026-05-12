@@ -95,7 +95,7 @@ body{font-family:var(--fb);background:var(--cream);color:var(--navy);min-height:
 
 .landing-logo{display:flex;align-items:center;gap:14px;margin-bottom:34px}
 .logo-mark{font-size:2.2rem;filter:drop-shadow(0 2px 8px rgba(0,0,0,.3))}
-.logo-name{font-family:var(--fd);font-size:1.85rem;color:#fff;line-height:1}
+.logo-name{font-family:var(--fd);font-size:3rem;color:#fff;line-height:1}
 .logo-tagline{font-size:.7rem;color:var(--soft);letter-spacing:.09em;text-transform:uppercase;margin-top:2px}
 
 .landing-headline{font-family:var(--fd);font-size:clamp(2.1rem,5.5vw,3.7rem);color:#fff;line-height:1.1;margin-bottom:15px}
@@ -295,7 +295,7 @@ body{font-family:var(--fb);background:var(--cream);color:var(--navy);min-height:
 
 .sidebar{width:var(--sw);flex-shrink:0;background:var(--navy);display:flex;flex-direction:column;height:100vh;position:sticky;top:0;overflow-y:auto;transition:transform var(--tr);z-index:200}
 .sidebar-top{display:flex;align-items:center;justify-content:space-between;padding:20px 17px 17px;border-bottom:1px solid rgba(255,255,255,.07);margin-bottom:10px}
-.sidebar-logo{display:flex;align-items:center;gap:10px;font-family:var(--fd);font-size:5.12rem;color:#fff}
+.sidebar-logo{display:flex;align-items:center;gap:10px;font-family:var(--fd);font-size:1.12rem;color:#fff}
 .sidebar-logo span:first-child{font-size:1.3rem}
 .sidebar-close{display:none;background:none;border:none;color:rgba(255,255,255,.35);font-size:1.1rem;cursor:pointer;padding:4px}
 
