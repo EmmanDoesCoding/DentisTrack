@@ -1132,32 +1132,26 @@ function renderBoardInWindow(win) {
   }
   .nl{
     display:inline-block;background:rgba(255,255,255,.18);color:#fff;
-    padding:4px 14px;border-radius:999px;
-    font-size:clamp(.7rem,1.5vw,.85rem);font-weight:700;letter-spacing:.08em;text-transform:uppercase;
-    margin-bottom:clamp(8px,1.5vw,16px);
-    animation:pulse 2s ease-in-out infinite;
-  }
-  /* BIG ⚡ emoji */
-  .ns-icon{
-    font-size:clamp(3rem,8vw,7rem);
-    display:block;line-height:1;margin-bottom:clamp(4px,1vw,10px);
+    padding:5px 18px;border-radius:999px;
+    font-size:clamp(.75rem,1.6vw,.95rem);font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+    margin-bottom:clamp(12px,2vw,22px);
     animation:pulse 2s ease-in-out infinite;
   }
   /* BIG name */
   .cname{
     font-family:'DM Serif Display',serif;
-    font-size:clamp(1.8rem,5.5vw,4.5rem);
-    color:#fff;margin-bottom:clamp(6px,1.2vw,14px);line-height:1.15;
+    font-size:clamp(2.8rem,8vw,7rem);
+    color:#fff;margin-bottom:clamp(8px,1.5vw,18px);line-height:1.1;
     word-break:break-word;
   }
   .csvcs{
-    font-size:clamp(.78rem,1.8vw,1.05rem);
-    color:rgba(255,255,255,.6);margin-bottom:clamp(8px,1.5vw,16px);
+    font-size:clamp(.85rem,2vw,1.2rem);
+    color:rgba(255,255,255,.65);margin-bottom:clamp(10px,1.8vw,20px);
   }
   /* BIG time */
   .cmeta{
-    font-size:clamp(1rem,2.5vw,1.8rem);
-    color:rgba(255,255,255,.5);font-weight:600;
+    font-size:clamp(1.2rem,3.2vw,2.6rem);
+    color:rgba(255,255,255,.55);font-weight:700;letter-spacing:.02em;
   }
   .ec{
     font-family:'DM Serif Display',serif;
@@ -1234,7 +1228,6 @@ function renderBoardInWindow(win) {
     ${next
       ? `<div class="cc">
           <div class="nl">Now Serving</div>
-          <span class="ns-icon">⚡</span>
           <div class="cname">${esc(next.name)}</div>
           <div class="csvcs">${next.svcs.map(s=>`${s.icon} ${s.name}`).join('  ·  ')}</div>
           <div class="cmeta">⏰ ${formatTime(next.time)}</div>
