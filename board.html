@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CliniQ — Queue Board</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,400;9..40,600;9..40,700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="board.css"/>
+</head>
+<body>
+
+  <!-- ── Loading screen ── -->
+  <div class="loading" id="loading">
+    <div class="loading-icon">🦷</div>
+    <div class="loading-text">CliniQ</div>
+    <div class="loading-sub">Loading queue data…</div>
+  </div>
+
+  <!-- ── Board (hidden until data loads) ── -->
+  <div id="board-content" style="display:none;flex-direction:column;height:100vh">
+
+    <div class="bh">
+      <div class="bl">🦷 CliniQ — Queue Display</div>
+      <div class="bt" id="board-time">🕐 --:-- --</div>
+    </div>
+
+    <div class="bb">
+
+      <div class="bl-l">
+        <div class="sl">Now Serving</div>
+        <div id="now-serving-card"></div>
+      </div>
+
+      <div class="bl-r">
+        <div class="sl" id="up-next-label">Up Next Today</div>
+        <div id="upcoming-list"></div>
+      </div>
+
+    </div>
+
+    <div class="bf">
+      <div class="ds" id="dentist-status-bar">
+        <div class="dot" id="dentist-dot"></div>
+        <span id="dentist-label">Loading…</span>
+      </div>
+      <div class="bfr">
+        <span class="sync-dot"></span>
+        Showing today's queue only · Auto-refreshes every 5s · CliniQ
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+
+    // ── Helpers ─────────────────────────────────────
+    function esc(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    function formatTime(t) {
+      if (!t) return '';
+      const [h, m] = t.split(':').map(Number);
+      return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+    }
+
+    function localToday() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    function hydrate(arr) {
+      return (arr || []).map(p => ({
+        ...p,
+        apptDT: p.apptDT ? new Date(p.apptDT) : new Date(`${p.date}T${p.time}`),
+      }));
+    }
+
+    // ── Render ──────────────────────────────────────
+    function renderBoard(data, dentistStatus) {
+      if (!data) return;
+
+      const queue    = hydrate(data.queue || []);
+      const today    = localToday();
+      const waiting  = queue.filter(p => p.status === 'waiting' && p.date === today).slice(0, 10);
+      const next     = waiting[0];
+      const upcoming = waiting.slice(1, 10);
+
+      // Clock
+      document.getElementById('board-time').textContent =
+        '🕐 ' + new Date().toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
+
+      // Now Serving
+      const nsEl = document.getElementById('now-serving-card');
+      nsEl.innerHTML = next
+        ? `<div class="cc">
+             <div class="nl">Now Serving</div>
+             <div class="cname">${esc(next.name)}</div>
+             <div class="csvcs">${next.svcs.map(s => `${s.icon} ${s.name}`).join('  ·  ')}</div>
+             <div class="cmeta">⏰ ${formatTime(next.time)}</div>
+           </div>`
+        : `<div class="cc"><div class="ec">No patients scheduled today</div></div>`;
+
+      // Up Next label
+      document.getElementById('up-next-label').textContent =
+        `Up Next Today${waiting.length > 1 ? ` (${waiting.length - 1} remaining)` : ''}`;
+
+      // Upcoming list
+      const upEl = document.getElementById('upcoming-list');
+      if (upcoming.length === 0) {
+        upEl.innerHTML = '<p style="color:rgba(255,255,255,.22);font-size:.87rem">No more patients today.</p>';
+      } else {
+        upEl.innerHTML = upcoming.map((p, i) => {
+          const isLast = i === upcoming.length - 1 && waiting.length > 1;
+          return `
+            <div class="ui ${isLast ? 'ui-last' : ''}">
+              <div class="un">${i + 2}</div>
+              <div class="uinfo">
+                <div class="uname">
+                  ${esc(p.name)}
+                  ${isLast ? '<span class="last-lbl">🔚 Last</span>' : ''}
+                </div>
+                <div class="usvcs">${p.svcs.map(s => s.name).join(', ')}</div>
+              </div>
+              <div class="utime">${formatTime(p.time)}</div>
+            </div>`;
+        }).join('');
+      }
+
+      // Dentist status
+      const status  = dentistStatus || data.dentistStatus || 'available';
+      const colors  = { available: '#27ae60', busy: '#e67e22', unavailable: '#e05757' };
+      const labels  = {
+        available:   '🟢 Dentist Available',
+        busy:        '🟡 Dentist With Patient',
+        unavailable: '🔴 Dentist Unavailable',
+      };
+      document.getElementById('dentist-dot').style.background   = colors[status];
+      document.getElementById('dentist-label').textContent      = labels[status] || status;
+      document.getElementById('dentist-status-bar').style.color = colors[status];
+    }
+
+    // ── Poll sessionStorage every 3s ─────────────────
+    function poll() {
+      try {
+        const raw     = sessionStorage.getItem('cliniq_board');
+        const dentist = sessionStorage.getItem('cliniq_dentist');
+        if (!raw) return;
+
+        renderBoard(JSON.parse(raw), dentist);
+
+        // Hide loading, show board
+        document.getElementById('loading').style.display = 'none';
+        const bc = document.getElementById('board-content');
+        bc.style.display = 'flex';
+      } catch (e) {
+        console.warn('Board poll error:', e);
+      }
+    }
+
+    poll();
+    setInterval(poll, 3000);
+
+    // Clock ticks every second independently
+    setInterval(() => {
+      const el = document.getElementById('board-time');
+      if (el) el.textContent =
+        '🕐 ' + new Date().toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
+    }, 1000);
+
+    // Show a helpful message if no data arrives after 8s
+    setTimeout(() => {
+      if (!sessionStorage.getItem('cliniq_board')) {
+        document.querySelector('.loading-sub').textContent =
+          'No data received. Make sure the main CliniQ window is open.';
+      }
+    }, 8000);
+
+  </script>
+</body>
+</html>
