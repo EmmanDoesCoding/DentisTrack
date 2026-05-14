@@ -1113,22 +1113,45 @@ function closeReceiptOnBg(e) { if (e.target===document.getElementById('receipt-o
 //  QUEUE BOARD
 // ══════════════════════════════════════════════════
 function openQueueBoard() {
-  const win = window.open('','DentisTrack_Board','width=1280,height=720,scrollbars=no');
-  if (!win) { showToast('Please allow popups for the Queue Board.'); return; }
-  renderBoardInWindow(win);
-  const iv = setInterval(()=>{ if(win.closed){clearInterval(iv);return;} renderBoardInWindow(win); }, 5000);
+  // Push current state to sessionStorage so board.html can read it immediately
+  try {
+    sessionStorage.setItem('cliniq_board', JSON.stringify(buildPayload()));
+    sessionStorage.setItem('cliniq_dentist', S.dentistStatus);
+  } catch(e) { /* ignore */ }
+
+  const win = window.open('board.html', 'CliniQ_Board', 'width=1280,height=720,scrollbars=no');
+  if (!win) {
+    showToast('⚠️ Please allow popups for the Queue Board.');
+    return;
+  }
+
+  // Keep pushing fresh data to sessionStorage every 5s so board auto-updates
+  const iv = setInterval(() => {
+    if (win.closed) { clearInterval(iv); return; }
+    try {
+      sessionStorage.setItem('cliniq_board', JSON.stringify(buildPayload()));
+      sessionStorage.setItem('cliniq_dentist', S.dentistStatus);
+    } catch(e) { /* ignore */ }
+  }, 5000);
 }
-function broadcastToBoard() { /* board auto-polls every 5s */ }
+
+function broadcastToBoard() {
+  // Push latest state whenever data changes so board reflects it quickly
+  try {
+    sessionStorage.setItem('cliniq_board', JSON.stringify(buildPayload()));
+    sessionStorage.setItem('cliniq_dentist', S.dentistStatus);
+  } catch(e) { /* ignore */ }
+}
 
 function renderBoardInWindow(win) {
-  const now     = new Date();
+  const nowDate  = new Date();
   // Use local date string to avoid UTC timezone mismatch at midnight
-  const today   = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  const today    = `${nowDate.getFullYear()}-${String(nowDate.getMonth()+1).padStart(2,'0')}-${String(nowDate.getDate()).padStart(2,'0')}`;
   // Only show today's waiting patients on the board, up to 10
-  const waiting = S.queue.filter(p => p.status==='waiting' && p.date===today).slice(0, 10);
+  const waiting  = S.queue.filter(p => p.status==='waiting' && p.date===today).slice(0, 10);
   const next     = waiting[0];
   const upcoming = waiting.slice(1, 10);
-  const now      = new Date().toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'});
+  const nowStr   = nowDate.toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'});
   const dc = {available:'#27ae60',busy:'#e67e22',unavailable:'#e05757'}[S.dentistStatus];
   const dl = {available:'🟢 Dentist Available',busy:'🟡 Dentist With Patient',unavailable:'🔴 Dentist Unavailable'}[S.dentistStatus];
 
@@ -1294,7 +1317,7 @@ function renderBoardInWindow(win) {
 
 <div class="bh">
   <div class="bl">🦷 CliniQ — Queue Display</div>
-  <div class="bt">🕐 ${now}</div>
+  <div class="bt">🕐 ${nowStr}</div>
 </div>
 
 <div class="bb">
