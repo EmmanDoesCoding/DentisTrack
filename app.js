@@ -91,7 +91,6 @@ function injectSyncBar() {
 // ══════════════════════════════════════════════════
 async function cloudLoad() {
   if (!JSONBIN_ID || JSONBIN_ID === 'YOUR_BIN_ID_HERE') {
-    // No credentials set — fall back to localStorage only
     lsCacheLoad();
     return;
   }
@@ -102,22 +101,74 @@ async function cloudLoad() {
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
-    const data = json.record;
+    const cloudData = json.record;
 
-    // If bin is empty / first time
-    if (!data || !data.nextId) {
-      lsCacheLoad();
-      // Push local data up if any
+    // Load whatever we have locally first
+    lsCacheLoad();
+    const localPatients  = [...S.patients];
+    const localQueue     = [...S.queue];
+    const localCompleted = [...S.completed];
+    const localNextId    = S.nextId;
+
+    if (!cloudData || !cloudData.nextId) {
+      // Bin is empty — push everything local up to cloud
       await cloudSave(true);
+      _syncOnline = true;
+      setSyncStatus('ok', 'Live sync active');
+      startPolling();
       return;
     }
 
-    applyData(data);
-    lsCacheWrite();        // update local cache from cloud
-    _syncOnline = true;
-    setSyncStatus('ok', 'Live sync active');
+    // Apply cloud data as the base
+    applyData(cloudData);
 
-    // Start polling every 6 seconds so admin sees patient bookings in real time
+    // MERGE: add any local patients that don't exist in cloud
+    // This fixes the case where an account was created before sync was working
+    let merged = false;
+    localPatients.forEach(lp => {
+      const existsInCloud = S.patients.find(cp =>
+        cp.contact === lp.contact || cp.id === lp.id
+      );
+      if (!existsInCloud) {
+        S.patients.push(lp);
+        merged = true;
+      }
+    });
+
+    // MERGE: add any local queue entries not in cloud
+    localQueue.forEach(lq => {
+      const existsInCloud = S.queue.find(cq => cq.id === lq.id);
+      if (!existsInCloud) {
+        S.queue.push(lq);
+        merged = true;
+      }
+    });
+
+    // MERGE: add any local completed entries not in cloud
+    localCompleted.forEach(lc => {
+      const existsInCloud = S.completed.find(cc => cc.id === lc.id);
+      if (!existsInCloud) {
+        S.completed.push(lc);
+        merged = true;
+      }
+    });
+
+    // Keep highest nextId to avoid ID collisions
+    if (localNextId > S.nextId) {
+      S.nextId = localNextId;
+      merged = true;
+    }
+
+    // Re-sort queue after merge
+    S.queue.sort((a,b) => a.apptDT - b.apptDT);
+
+    lsCacheWrite();
+    _syncOnline = true;
+    setSyncStatus('ok', merged ? 'Merged & synced ✓' : 'Live sync active');
+
+    // If we merged local data in, push the merged result back to cloud immediately
+    if (merged) await cloudSave(true);
+
     startPolling();
   } catch (e) {
     console.warn('JSONBin load failed, using local cache:', e);
@@ -326,9 +377,10 @@ async function patientSignIn() {
   const err     = document.getElementById('si-err');
   if (!contact || !name) { err.textContent = 'Please fill in both fields.'; return; }
 
-  // Pull fresh data from cloud before checking — ensures phone registrations are visible
+  err.textContent = '';
+
+  // Always pull fresh data from cloud before checking
   if (_syncOnline) {
-    err.textContent = '';
     try {
       const res  = await fetch(JSONBIN_URL + '/latest', { headers: { 'X-Master-Key': JSONBIN_KEY } });
       const json = await res.json();
@@ -336,8 +388,42 @@ async function patientSignIn() {
     } catch(e) { /* use cached data */ }
   }
 
-  const found = S.patients.find(p => p.contact === contact && p.name.toLowerCase() === name);
-  if (!found) { err.textContent = 'No account found. Check your details or register as a new patient.'; return; }
+  // Primary check — look in registered patients list
+  let found = S.patients.find(p =>
+    p.contact === contact && p.name.toLowerCase() === name
+  );
+
+  // Fallback — if not found in patients, check the queue and completed lists
+  // This handles the case where an account was created before sync was working
+  if (!found) {
+    const inQueue     = S.queue.find(p => p.contact === contact && p.name.toLowerCase() === name);
+    const inCompleted = S.completed.find(p => p.contact === contact && p.name.toLowerCase() === name);
+    const match       = inQueue || inCompleted;
+
+    if (match) {
+      // Auto-recover — create the missing patient account from queue data
+      const recovered = {
+        id:         S.nextId++,
+        name:       match.name,
+        contact:    match.contact,
+        age:        match.age        || '',
+        gender:     match.gender     || '',
+        joinedDate: match.joinedAt
+          ? new Date(match.joinedAt).toISOString().split('T')[0]
+          : new Date().toISOString().split('T')[0],
+      };
+      S.patients.push(recovered);
+      save(); // push the recovered account to cloud so it works on all devices next time
+      found = recovered;
+      showToast('👋 Account recovered! You\'re signed back in.');
+    }
+  }
+
+  if (!found) {
+    err.textContent = 'No account found. Please check your name and contact number, or register as a new patient.';
+    return;
+  }
+
   currentPatient = found;
   showPage('page-patient-dashboard');
 }
