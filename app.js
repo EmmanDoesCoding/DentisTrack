@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════
-   CliniQ — app.js  v6
-   JSONBin real-time sync + localStorage fallback
+   CliniQ — app.js  v7
+   JSONBin as single source of truth — no localStorage
 ═══════════════════════════════════════════════ */
 'use strict';
 
@@ -32,12 +32,6 @@ const SERVICES = [
 const ADMIN_CREDS  = { username:'admin', password:'dentis2024' };
 const CLINIC_OPEN  = 8;
 const CLINIC_CLOSE = 16;  // 4 PM closing time
-
-// localStorage fallback keys
-const LS = {
-  CACHE:   'dt_cache',       // full state snapshot
-  SYNCED:  'dt_last_synced', // ISO timestamp of last successful sync
-};
 
 // ══════════════════════════════════════════════════
 //  STATE
@@ -87,13 +81,19 @@ function injectSyncBar() {
 }
 
 // ══════════════════════════════════════════════════
-//  JSONBIN — LOAD FROM CLOUD
+//  JSONBIN — LOAD FROM CLOUD (single source of truth)
 // ══════════════════════════════════════════════════
 async function cloudLoad() {
+  showLoadingOverlay(true);
+
   if (!JSONBIN_ID || JSONBIN_ID === 'YOUR_BIN_ID_HERE') {
-    lsCacheLoad();
+    showLoadingOverlay(false);
+    showToast('⚠️ JSONBin credentials not set. Please configure app.js.');
+    setSyncStatus('error', 'No credentials set');
+    checkSeedNeeded();
     return;
   }
+
   setSyncStatus('syncing', 'Connecting…');
   try {
     const res = await fetch(JSONBIN_URL + '/latest', {
@@ -101,117 +101,121 @@ async function cloudLoad() {
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
-    const cloudData = json.record;
+    const data = json.record;
 
-    // Load whatever we have locally first
-    lsCacheLoad();
-    const localPatients  = [...S.patients];
-    const localQueue     = [...S.queue];
-    const localCompleted = [...S.completed];
-    const localNextId    = S.nextId;
+    if (!data || !data.nextId) {
+      // Bin exists but is empty — seed demo data and push it up
+      checkSeedNeeded();
+      await _pushToCloud();
+    } else {
+      applyData(data);
 
-    if (!cloudData || !cloudData.nextId) {
-      // Bin is empty — push everything local up to cloud
-      await cloudSave(true);
-      _syncOnline = true;
-      setSyncStatus('ok', 'Live sync active');
-      startPolling();
-      return;
+      // Auto-recover: create patient accounts for anyone in queue/completed
+      // who doesn't have one — fixes accounts that were never properly saved
+      let recovered = false;
+      [...S.queue, ...S.completed].forEach(appt => {
+        if (!appt.contact || !appt.name) return;
+        const hasAccount = S.patients.find(p => p.contact === appt.contact);
+        if (!hasAccount) {
+          S.patients.push({
+            id:         S.nextId++,
+            name:       appt.name,
+            contact:    appt.contact,
+            age:        appt.age    || '',
+            gender:     appt.gender || '',
+            joinedDate: appt.joinedAt
+              ? new Date(appt.joinedAt).toISOString().split('T')[0]
+              : new Date().toISOString().split('T')[0],
+          });
+          recovered = true;
+        }
+      });
+
+      if (recovered) {
+        S.queue.sort((a,b) => new Date(a.apptDT) - new Date(b.apptDT));
+        setSyncStatus('syncing', 'Recovering accounts…');
+        await _pushToCloud();
+        setSyncStatus('ok', 'Accounts recovered ✓');
+      }
     }
 
-    // Apply cloud data as the base
-    applyData(cloudData);
-
-    // MERGE: add any local patients that don't exist in cloud
-    // This fixes the case where an account was created before sync was working
-    let merged = false;
-    localPatients.forEach(lp => {
-      const existsInCloud = S.patients.find(cp =>
-        cp.contact === lp.contact || cp.id === lp.id
-      );
-      if (!existsInCloud) {
-        S.patients.push(lp);
-        merged = true;
-      }
-    });
-
-    // MERGE: add any local queue entries not in cloud
-    localQueue.forEach(lq => {
-      const existsInCloud = S.queue.find(cq => cq.id === lq.id);
-      if (!existsInCloud) {
-        S.queue.push(lq);
-        merged = true;
-      }
-    });
-
-    // MERGE: add any local completed entries not in cloud
-    localCompleted.forEach(lc => {
-      const existsInCloud = S.completed.find(cc => cc.id === lc.id);
-      if (!existsInCloud) {
-        S.completed.push(lc);
-        merged = true;
-      }
-    });
-
-    // Keep highest nextId to avoid ID collisions
-    if (localNextId > S.nextId) {
-      S.nextId = localNextId;
-      merged = true;
-    }
-
-    // Re-sort queue after merge
-    S.queue.sort((a,b) => a.apptDT - b.apptDT);
-
-    lsCacheWrite();
     _syncOnline = true;
-    setSyncStatus('ok', merged ? 'Merged & synced ✓' : 'Live sync active');
-
-    // If we merged local data in, push the merged result back to cloud immediately
-    if (merged) await cloudSave(true);
-
+    setSyncStatus('ok', 'Live sync active');
     startPolling();
   } catch (e) {
-    console.warn('JSONBin load failed, using local cache:', e);
+    console.warn('JSONBin load failed:', e);
     _syncOnline = false;
-    lsCacheLoad();
-    setSyncStatus('offline', 'Offline — local data only');
+    setSyncStatus('error', 'Cannot connect to cloud — check credentials');
+    showToast('❌ Could not connect to JSONBin. Check your credentials.');
+    checkSeedNeeded();
+  } finally {
+    showLoadingOverlay(false);
+  }
+}
+
+// ── Loading overlay ────────────────────────────────
+function showLoadingOverlay(show) {
+  let el = document.getElementById('loading-overlay');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'loading-overlay';
+    el.style.cssText = `
+      position:fixed;inset:0;background:#0d2b26;z-index:99999;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      font-family:'DM Sans',sans-serif;color:#fff;gap:16px;
+      transition:opacity .3s ease;
+    `;
+    el.innerHTML = `
+      <div style="font-size:3rem;animation:spin 1s linear infinite">🦷</div>
+      <div style="font-family:'DM Serif Display',serif;font-size:1.8rem">CliniQ</div>
+      <div style="font-size:.9rem;color:rgba(255,255,255,.5)">Connecting to cloud…</div>
+      <style>@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}</style>
+    `;
+    document.body.appendChild(el);
+  }
+  if (show) {
+    el.style.opacity = '1';
+    el.style.pointerEvents = 'all';
+    el.style.display = 'flex';
+  } else {
+    el.style.opacity = '0';
+    el.style.pointerEvents = 'none';
+    setTimeout(() => { if (el) el.style.display = 'none'; }, 350);
   }
 }
 
 // ══════════════════════════════════════════════════
-//  JSONBIN — SAVE TO CLOUD  (debounced 400ms)
+//  JSONBIN — SAVE TO CLOUD
+//  force=true  → immediate, bypasses debounce
+//  force=false → debounced 400ms
 // ══════════════════════════════════════════════════
-function cloudSave(immediate = false) {
-  if (!JSONBIN_ID || JSONBIN_ID === 'YOUR_BIN_ID_HERE') {
-    lsCacheWrite(); // no credentials, just save locally
-    return;
-  }
-  lsCacheWrite(); // always write local cache first (instant)
+function cloudSave(force = false) {
+  if (!JSONBIN_ID || JSONBIN_ID === 'YOUR_BIN_ID_HERE') return;
+  if (force) return _pushToCloud();
   clearTimeout(_syncTimer);
-  const delay = immediate ? 0 : 400;
-  _syncTimer = setTimeout(async () => {
-    setSyncStatus('syncing', 'Saving…');
-    try {
-      const payload = buildPayload();
-      const res = await fetch(JSONBIN_URL, {
-        method:  'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Master-Key': JSONBIN_KEY,
-        },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      _syncOnline = true;
-      localStorage.setItem(LS.SYNCED, new Date().toISOString());
-      setSyncStatus('ok', `Synced ${fmtSyncTime()}`);
-      broadcastToBoard();
-    } catch (e) {
-      console.warn('JSONBin save failed:', e);
-      _syncOnline = false;
-      setSyncStatus('error', 'Sync failed — saved locally');
-    }
-  }, delay);
+  _syncTimer = setTimeout(() => _pushToCloud(), 400);
+}
+
+async function _pushToCloud() {
+  setSyncStatus('syncing', 'Saving…');
+  try {
+    const res = await fetch(JSONBIN_URL, {
+      method:  'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Master-Key': JSONBIN_KEY,
+      },
+      body: JSON.stringify(buildPayload()),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    _syncOnline = true;
+    setSyncStatus('ok', `Synced ${fmtSyncTime()}`);
+    broadcastToBoard();
+  } catch (e) {
+    console.warn('JSONBin save failed:', e);
+    _syncOnline = false;
+    setSyncStatus('error', 'Sync failed — please check connection');
+  }
 }
 
 // ══════════════════════════════════════════════════
@@ -234,9 +238,8 @@ function startPolling() {
       // Only update if remote nextId is ahead (means someone else wrote data)
       if (data.nextId > S.nextId || data.queue?.length !== S.queue.length || data.patients?.length !== S.patients.length) {
         applyData(data);
-        lsCacheWrite();
         // Re-render whatever is currently visible
-        const dash = document.getElementById('page-admin-dashboard');
+        const dash  = document.getElementById('page-admin-dashboard');
         const pdash = document.getElementById('page-patient-dashboard');
         if (dash?.classList.contains('active'))  renderDashboard();
         if (pdash?.classList.contains('active')) renderPatientDashboard();
@@ -284,30 +287,6 @@ function applyData(data) {
   S.dentistStatus = data.dentistStatus || 'available';
 }
 
-// ══════════════════════════════════════════════════
-//  LOCALSTORAGE CACHE  (fallback & speed layer)
-// ══════════════════════════════════════════════════
-function lsCacheWrite() {
-  try {
-    localStorage.setItem(LS.CACHE, JSON.stringify(buildPayload()));
-  } catch(e) { console.warn('localStorage write failed', e); }
-}
-
-function lsCacheLoad() {
-  try {
-    const raw = localStorage.getItem(LS.CACHE);
-    if (!raw) { checkSeedNeeded(); return; }
-    applyData(JSON.parse(raw));
-    const synced = localStorage.getItem(LS.SYNCED);
-    setSyncStatus('offline', synced
-      ? `Offline — last synced ${new Date(synced).toLocaleTimeString()}`
-      : 'Offline — local data');
-  } catch(e) {
-    console.warn('localStorage read failed, starting fresh', e);
-    checkSeedNeeded();
-  }
-}
-
 function checkSeedNeeded() {
   if (S.queue.length === 0 && S.completed.length === 0 && S.patients.length === 0) {
     seedDemo();
@@ -318,16 +297,17 @@ function fmtSyncTime() {
   return new Date().toLocaleTimeString('en-PH', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
 }
 
-// Unified save call — every write goes through here
-function save() { cloudSave(); }
+// Unified save — debounced for normal interactions
+function save() { cloudSave(false); }
 
 // ══════════════════════════════════════════════════
 //  BOOT
 // ══════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', async () => {
+  // Wipe any old localStorage data from previous versions — JSONBin is now the only source of truth
+  try { localStorage.clear(); } catch(e) { /* ignore */ }
   injectSyncBar();
   await cloudLoad();
-  checkSeedNeeded();
 });
 
 // ══════════════════════════════════════════════════
@@ -457,7 +437,7 @@ async function patientRegister() {
 
   const patient = { id: S.nextId++, name, contact, age, gender, joinedDate: new Date().toISOString().split('T')[0] };
   S.patients.push(patient);
-  save();
+  await _pushToCloud(); // force immediate cloud save
 
   currentPatient = patient;
   showToast(`Welcome, ${patient.name}! 🦷`);
@@ -689,7 +669,7 @@ async function patientJoinQueue() {
 
   S.queue.push(appt);
   S.queue.sort((a,b)=>a.apptDT-b.apptDT);
-  save();
+  await _pushToCloud(); // immediate — don't debounce queue bookings
 
   const pos = S.queue.filter(p=>p.status==='waiting').findIndex(p=>p.id===appt.id)+1;
   showConfirmPage(appt, pos);
