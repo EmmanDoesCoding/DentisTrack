@@ -297,6 +297,13 @@ function fmtSyncTime() {
   return new Date().toLocaleTimeString('en-PH', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
 }
 
+// Returns today's date as YYYY-MM-DD using LOCAL timezone (not UTC)
+// This prevents midnight timezone bugs where toISOString() returns yesterday
+function localToday() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
 // Unified save — debounced for normal interactions
 function save() { cloudSave(false); }
 
@@ -1114,7 +1121,9 @@ function openQueueBoard() {
 function broadcastToBoard() { /* board auto-polls every 5s */ }
 
 function renderBoardInWindow(win) {
-  const today   = new Date().toISOString().split('T')[0];
+  const now     = new Date();
+  // Use local date string to avoid UTC timezone mismatch at midnight
+  const today   = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
   // Only show today's waiting patients on the board, up to 10
   const waiting = S.queue.filter(p => p.status==='waiting' && p.date===today).slice(0, 10);
   const next     = waiting[0];
