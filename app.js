@@ -577,7 +577,7 @@ function updateBill(prefix='pd-') {
 
 function setMinDate(fieldId='pd-date') {
   const d = document.getElementById(fieldId);
-  if (d) d.min = new Date().toISOString().split('T')[0];
+  if (d) d.min = localToday();
 }
 
 function resetPdSlots() {
@@ -842,7 +842,7 @@ function renderQueueTab() {
   if (S.queue.length===0) { el.innerHTML=emptyState('📋','No patients in queue','Patients will appear here after check-in.'); return; }
 
   // Find index of last patient scheduled for TODAY (for last-patient indicator)
-  const today = new Date().toISOString().split('T')[0];
+  const today = localToday();
   const todayWaiting = S.queue.filter(p=>p.status==='waiting'&&p.date===today);
   const lastTodayId  = todayWaiting.length > 0 ? todayWaiting[todayWaiting.length-1].id : null;
 
@@ -933,7 +933,7 @@ function renderHistoryDays(dates, byDate) {
     container.innerHTML=`<div style="text-align:center;padding:40px 16px;color:var(--muted)"><span style="font-size:2.5rem;display:block;margin-bottom:10px;opacity:.38">📅</span><p>No appointment history yet.</p></div>`;
     return;
   }
-  const today = new Date().toISOString().split('T')[0];
+  const today = localToday();
   container.innerHTML = dates.map((date,di) => {
     const pts = byDate[date];
     const rev = pts.reduce((a,p)=>a+p.total,0);
@@ -1024,7 +1024,7 @@ function renderDentistTab() {
 }
 
 function renderTodaySchedule() {
-  const today = new Date().toISOString().split('T')[0];
+  const today = localToday();
   const all   = [...S.completed.filter(p=>p.date===today), ...S.queue.filter(p=>p.date===today&&p.status==='waiting')]
     .sort((a,b)=>a.time.localeCompare(b.time));
   if (!all.length) return '<p style="color:var(--muted);font-size:.85rem">No appointments today.</p>';
