@@ -891,17 +891,24 @@ function renderCompletedTab() {
   if (S.completed.length===0) { el.innerHTML=emptyState('✅','No completed patients','Completed patients will appear here.'); return; }
   el.innerHTML = [...S.completed].reverse().map(p => {
     const amt = p.hasVar?`₱${p.total.toLocaleString()}+`:`₱${p.total.toLocaleString()}`;
+    const hasFollowup = p.followupDate;
     return `<div class="q-card">
       <div class="q-num" style="background:var(--success-bg);color:var(--success);border-color:var(--success)">✓</div>
       <div class="q-info">
         <div class="q-name">${esc(p.name)}</div>
         <div class="q-svcs">${p.svcs.map(s=>`${s.icon} ${s.name}`).join(' · ')}</div>
         <div class="q-meta">📅 ${formatDate(p.date)} · ⏰ ${formatTime(p.time)} · 📞 ${esc(p.contact)}</div>
+        ${hasFollowup ? `<div class="q-meta" style="color:var(--teal)">📆 Follow-up: ${formatDate(p.followupDate)}${p.followupNote?' · '+esc(p.followupNote):''}</div>` : ''}
       </div>
       <div class="q-right">
         <div class="q-amt">${amt}</div>
         <span class="badge b-done">Completed</span>
-        <div class="q-actions"><button class="btn btn-sm btn-outline" onclick="openReceipt(${p.id},true)">🧾 Receipt</button></div>
+        <div class="q-actions">
+          <button class="btn btn-sm btn-outline" onclick="openReceipt(${p.id},true)">🧾 Receipt</button>
+          ${currentTier==='premium'
+            ? `<button class="btn btn-sm" style="background:var(--teal-xlt);color:var(--teal-dk)" onclick="openFollowup(${p.id})">📆 ${hasFollowup?'Edit':'Set'} Follow-up</button>`
+            : ''}
+        </div>
       </div>
     </div>`;
   }).join('');
@@ -1370,23 +1377,22 @@ function renderBoardInWindow(win) {
 function renderAnalyticsTab() {
   const el = document.getElementById('analytics-grid');
   if (!el || currentTier !== 'premium') return;
-  const today    = localToday();
-  const thisMonth = today.slice(0,7);
-  const allDone  = S.completed;
-  const todayPts = allDone.filter(p=>p.date===today);
-  const monthPts = allDone.filter(p=>p.date?.startsWith(thisMonth));
 
-  // Peak hour calculation
+  const today     = localToday();
+  const thisMonth = today.slice(0,7);
+  const allDone   = S.completed;
+  const todayPts  = allDone.filter(p=>p.date===today);
+  const monthPts  = allDone.filter(p=>p.date?.startsWith(thisMonth));
+
+  // Peak hour
   const hourCounts = {};
   allDone.forEach(p => {
     if (!p.time) return;
     const h = parseInt(p.time.split(':')[0]);
     hourCounts[h] = (hourCounts[h]||0) + 1;
   });
-  const peakHour = Object.keys(hourCounts).sort((a,b)=>hourCounts[b]-hourCounts[a])[0];
-  const peakLabel = peakHour
-    ? formatTime(`${String(peakHour).padStart(2,'0')}:00`)
-    : '—';
+  const peakHour  = Object.keys(hourCounts).sort((a,b)=>hourCounts[b]-hourCounts[a])[0];
+  const peakLabel = peakHour ? formatTime(`${String(peakHour).padStart(2,'0')}:00`) : '—';
 
   // Top service
   const svcCount = {};
@@ -1394,22 +1400,72 @@ function renderAnalyticsTab() {
   const topSvcId = Object.keys(svcCount).sort((a,b)=>svcCount[b]-svcCount[a])[0];
   const topSvc   = SERVICES.find(s=>s.id===topSvcId);
 
-  // Returning patients (appeared more than once in completed)
+  // Retention
   const patientVisits = {};
   allDone.forEach(p=>{ patientVisits[p.contact]=(patientVisits[p.contact]||0)+1; });
-  const returning = Object.values(patientVisits).filter(v=>v>1).length;
-  const retentionPct = allDone.length
-    ? Math.round((returning / Object.keys(patientVisits).length)*100)
-    : 0;
+  const returning    = Object.values(patientVisits).filter(v=>v>1).length;
+  const totalUnique  = Object.keys(patientVisits).length;
+  const retentionPct = totalUnique ? Math.round((returning/totalUnique)*100) : 0;
+
+  // ── Daily patients bar chart (last 7 days) ────────
+  const days = [];
+  for (let i=6; i>=0; i--) {
+    const d   = new Date(Date.now() - i*86400000);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const lbl = d.toLocaleDateString('en-PH',{weekday:'short'});
+    const cnt = allDone.filter(p=>p.date===key).length;
+    days.push({ key, lbl, cnt });
+  }
+  const maxCnt  = Math.max(...days.map(d=>d.cnt), 1);
+  const barW    = 36;
+  const barGap  = 18;
+  const chartH  = 120;
+  const chartW  = days.length * (barW + barGap) + barGap;
+  const barsSVG = days.map((d,i) => {
+    const bh  = Math.max(4, Math.round((d.cnt / maxCnt) * chartH));
+    const bx  = barGap + i*(barW+barGap);
+    const by  = chartH - bh;
+    const isToday = d.key === today;
+    return `
+      <rect x="${bx}" y="${by}" width="${barW}" height="${bh}"
+        fill="${isToday?'#1a8a78':'#c2ede5'}" rx="5"/>
+      ${d.cnt > 0 ? `<text x="${bx+barW/2}" y="${by-5}" text-anchor="middle"
+        font-size="11" fill="${isToday?'#126b5e':'#7a9993'}" font-family="DM Sans,sans-serif" font-weight="600">${d.cnt}</text>` : ''}
+      <text x="${bx+barW/2}" y="${chartH+16}" text-anchor="middle"
+        font-size="10" fill="#7a9993" font-family="DM Sans,sans-serif">${d.lbl}</text>
+      ${isToday ? `<text x="${bx+barW/2}" y="${chartH+28}" text-anchor="middle"
+        font-size="8" fill="#1a8a78" font-family="DM Sans,sans-serif" font-weight="700">TODAY</text>` : ''}`;
+  }).join('');
 
   el.innerHTML = `
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px">
-      <div class="rev-card hl"><div class="rev-lbl">Today's Patients</div><div class="rev-val">${todayPts.length}</div></div>
+    <!-- Stat chips -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:4px">
+      <div class="rev-card hl"><div class="rev-lbl">Today&#39;s Patients</div><div class="rev-val">${todayPts.length}</div></div>
       <div class="rev-card"><div class="rev-lbl">This Month</div><div class="rev-val">${monthPts.length}</div></div>
       <div class="rev-card"><div class="rev-lbl">Patient Retention</div><div class="rev-val">${retentionPct}%</div></div>
-      <div class="rev-card"><div class="rev-lbl">Peak Hour</div><div class="rev-val" style="font-size:1.4rem">${peakLabel}</div></div>
-      <div class="rev-card"><div class="rev-lbl">Most Popular Service</div><div class="rev-val" style="font-size:1.2rem">${topSvc ? topSvc.icon+' '+topSvc.name : '—'}</div></div>
-      <div class="rev-card"><div class="rev-lbl">Total Patients Served</div><div class="rev-val">${allDone.length}</div></div>
+      <div class="rev-card"><div class="rev-lbl">Peak Hour</div><div class="rev-val" style="font-size:1.3rem">${peakLabel}</div></div>
+      <div class="rev-card"><div class="rev-lbl">Top Service</div><div class="rev-val" style="font-size:1rem;line-height:1.3">${topSvc?topSvc.icon+' '+topSvc.name:'—'}</div></div>
+      <div class="rev-card"><div class="rev-lbl">Total Served</div><div class="rev-val">${allDone.length}</div></div>
+    </div>
+
+    <!-- Bar chart -->
+    <div class="rev-card" style="grid-column:1/-1">
+      <div class="rev-lbl" style="margin-bottom:18px">📊 Patients Per Day — Last 7 Days</div>
+      <div style="overflow-x:auto">
+        <svg width="${chartW}" height="${chartH+40}" viewBox="0 0 ${chartW} ${chartH+40}"
+             style="display:block;min-width:${chartW}px">
+          <!-- Gridlines -->
+          ${[0.25,0.5,0.75,1].map(frac=>{
+            const y = chartH - Math.round(frac*chartH);
+            const v = Math.round(frac*maxCnt);
+            return `
+              <line x1="0" y1="${y}" x2="${chartW}" y2="${y}" stroke="#e8f7f4" stroke-width="1"/>
+              <text x="2" y="${y-3}" font-size="9" fill="#b5d4cf" font-family="DM Sans,sans-serif">${v}</text>`;
+          }).join('')}
+          ${barsSVG}
+        </svg>
+      </div>
+      ${allDone.length===0?`<p style="text-align:center;color:var(--muted);font-size:.84rem;margin-top:8px">Complete some appointments to see data here.</p>`:''}
     </div>`;
 }
 
@@ -1494,6 +1550,57 @@ function renderFollowupTab() {
 }
 
 // ══════════════════════════════════════════════════
+//  FOLLOW-UP MODAL
+// ══════════════════════════════════════════════════
+let _followupPatientId = null;
+
+function openFollowup(patientId) {
+  const p = S.completed.find(q=>q.id===patientId);
+  if (!p) return;
+  _followupPatientId = patientId;
+
+  // Pre-fill if follow-up already set
+  document.getElementById('followup-date-input').value  = p.followupDate || '';
+  document.getElementById('followup-note-input').value  = p.followupNote || '';
+  document.getElementById('followup-err').textContent   = '';
+  document.getElementById('followup-date-input').min    = localToday();
+
+  document.getElementById('followup-patient-info').innerHTML = `
+    <strong>${esc(p.name)}</strong> &nbsp;·&nbsp; 📅 ${formatDate(p.date)}<br/>
+    <span style="color:var(--muted)">${p.svcs.map(s=>s.icon+' '+s.name).join(' · ')}</span>`;
+
+  document.getElementById('followup-overlay').classList.add('open');
+}
+
+function saveFollowup() {
+  const date = document.getElementById('followup-date-input').value;
+  const note = document.getElementById('followup-note-input').value.trim();
+  const err  = document.getElementById('followup-err');
+
+  if (!date) { err.textContent = 'Please select a return date.'; return; }
+  if (date <= localToday()) { err.textContent = 'Follow-up date must be in the future.'; return; }
+
+  const p = S.completed.find(q=>q.id===_followupPatientId);
+  if (!p) return;
+
+  p.followupDate = date;
+  p.followupNote = note;
+  save();
+
+  closeFollowup();
+  showToast(`📆 Follow-up set for ${p.name} on ${formatDate(date)}`);
+  renderDashboard();
+}
+
+function closeFollowup() {
+  document.getElementById('followup-overlay').classList.remove('open');
+  _followupPatientId = null;
+}
+function closeFollowupOnBg(e) {
+  if (e.target===document.getElementById('followup-overlay')) closeFollowup();
+}
+
+// ══════════════════════════════════════════════════
 //  ABOUT MODAL
 // ══════════════════════════════════════════════════
 function openAbout() {
@@ -1554,11 +1661,14 @@ function applyTierUI() {
       </div>`;
   }
 
-  // Toggle button text
-  const toggleBtn = document.getElementById('btn-tier-toggle');
+  // Toggle button text + icon
+  const toggleBtn  = document.getElementById('btn-tier-toggle');
+  const toggleIcon = document.getElementById('tier-toggle-icon');
+  const toggleLbl  = document.getElementById('tier-toggle-label');
   if (toggleBtn) {
-    toggleBtn.textContent = isPremium ? '🔽 Switch to Free Plan' : '⬆️ Switch to Premium';
     toggleBtn.classList.toggle('is-premium', isPremium);
+    if (toggleIcon) toggleIcon.textContent = isPremium ? '🔽' : '⭐';
+    if (toggleLbl)  toggleLbl.textContent  = isPremium ? 'Switch to Free Plan' : 'Switch to Premium';
   }
 
   // Nav item locks

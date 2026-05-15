@@ -42,11 +42,10 @@
     </div>
     <p class="landing-hours">Mon – Sat &nbsp;·&nbsp; 8:00 AM – 5:00 PM</p>
 
-    <!-- About + Pricing buttons at bottom -->
+    <!-- About + Pricing — visible pill buttons -->
     <div class="landing-footer-btns">
-      <button class="btn-text" onclick="openAbout()">ℹ️ About CliniQ</button>
-      <span class="footer-sep">·</span>
-      <button class="btn-text" onclick="openPricing()">💎 View Plans</button>
+      <button class="btn btn-landing-pill" onclick="openAbout()">ℹ️ About CliniQ</button>
+      <button class="btn btn-landing-pill btn-landing-pill-gold" onclick="openPricing()">💎 View Plans</button>
     </div>
   </div>
 </div>
@@ -276,7 +275,12 @@
 
     <div class="sidebar-bottom">
       <button class="btn-board" onclick="openQueueBoard()">📺 Queue Board</button>
-      <button class="btn-tier-toggle" id="btn-tier-toggle" onclick="toggleTier()">⬆️ Switch to Premium</button>
+      <div class="tier-toggle-wrap" id="tier-toggle-wrap">
+        <button class="btn-tier-toggle" id="btn-tier-toggle" onclick="toggleTier()">
+          <span id="tier-toggle-icon">⬆️</span>
+          <span id="tier-toggle-label">Switch to Premium</span>
+        </button>
+      </div>
       <button class="sidebar-logout" onclick="adminLogout()">⬅ Logout</button>
     </div>
   </aside>
@@ -327,7 +331,7 @@
 
     <div class="about-divider"></div>
 
-    <div class="about-team-title">👥 Built by</div>
+<div class="about-team-title">👥 Built by</div>
     <div class="about-team">
       <!-- ── SLOT 1 ── -->
       <div class="about-member">
@@ -444,6 +448,28 @@
     <div class="receipt-btns no-print">
       <button class="btn btn-primary" onclick="window.print()">🖨️ Print</button>
       <button class="btn btn-outline" onclick="closeReceipt()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- FOLLOW-UP MODAL -->
+<div class="modal-overlay" id="followup-overlay" onclick="closeFollowupOnBg(event)">
+  <div class="modal-box" style="max-width:400px">
+    <h3 style="font-family:var(--fd);font-size:1.5rem;color:var(--navy);margin-bottom:6px">📆 Set Follow-up</h3>
+    <p style="font-size:.86rem;color:var(--muted);margin-bottom:20px">Set a recommended return date for this patient.</p>
+    <div id="followup-patient-info" style="background:var(--teal-xlt);border-radius:var(--r-md);padding:12px 14px;margin-bottom:16px;font-size:.87rem;color:var(--slate)"></div>
+    <div class="form-group">
+      <label>Recommended Return Date</label>
+      <input type="date" id="followup-date-input"/>
+    </div>
+    <div class="form-group">
+      <label>Notes <span class="label-hint">(optional)</span></label>
+      <input type="text" id="followup-note-input" placeholder="e.g. Return for cleaning, bring X-ray"/>
+    </div>
+    <p class="auth-error" id="followup-err"></p>
+    <div style="display:flex;gap:10px;margin-top:4px">
+      <button class="btn btn-primary" style="flex:1" onclick="saveFollowup()">Save Follow-up</button>
+      <button class="btn btn-outline" onclick="closeFollowup()">Cancel</button>
     </div>
   </div>
 </div>
