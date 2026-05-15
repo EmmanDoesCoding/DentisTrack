@@ -14,7 +14,7 @@ const JSONBIN_KEY = '$2a$10$6YUxFYON7tl.lHl13unwY.JY7BTEdnDYxnRzbS2pZriMdq5EdLEM
 // ══════════════════════════════════════════════════
 
 const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_ID}`;
-
+ 
 // ══════════════════════════════════════════════════
 //  SERVICES
 // ══════════════════════════════════════════════════
@@ -28,11 +28,11 @@ const SERVICES = [
   { id:'s7', name:'Braces Adjustment',       icon:'⚙️', price:1000,  priceDisplay:'₱1,000',         fixed:true,  durMin:60,  durMax:60,  note:'' },
   { id:'s8', name:'Wisdom Tooth Extraction', icon:'💎', price:8000,  priceDisplay:'₱8,000–₱15,000', fixed:false, durMin:90,  durMax:120, note:'Final price depends on case complexity.' },
 ];
-
+ 
 const ADMIN_CREDS  = { username:'admin', password:'dentis2024' };
 const CLINIC_OPEN  = 8;
 const CLINIC_CLOSE = 16;  // 4 PM closing time
-
+ 
 // ══════════════════════════════════════════════════
 //  STATE
 // ══════════════════════════════════════════════════
@@ -44,13 +44,13 @@ let S = {
   dentistStatus: 'available',
   notifTimers:   {},
 };
-
+ 
 let selectedSvcs    = new Set();
 let currentPatient  = null;
 let _syncTimer      = null;   // debounce handle
 let _pollTimer      = null;   // auto-poll handle
 let _syncOnline     = false;  // are we connected to JSONBin?
-
+ 
 // ══════════════════════════════════════════════════
 //  SYNC STATUS UI
 // ══════════════════════════════════════════════════
@@ -69,7 +69,7 @@ function setSyncStatus(status, msg) {
   el.style.color  = colors[status];
   el.style.display = 'block';
 }
-
+ 
 // Inject the sync status bar into the admin sidebar bottom once DOM is ready
 function injectSyncBar() {
   const sb = document.querySelector('.sidebar-bottom');
@@ -79,13 +79,13 @@ function injectSyncBar() {
   bar.style.cssText = 'font-size:.72rem;padding:6px 4px 2px;text-align:left;display:none;font-weight:600;transition:color .3s';
   sb.insertBefore(bar, sb.firstChild);
 }
-
+ 
 // ══════════════════════════════════════════════════
 //  JSONBIN — LOAD FROM CLOUD (single source of truth)
 // ══════════════════════════════════════════════════
 async function cloudLoad() {
   showLoadingOverlay(true);
-
+ 
   if (!JSONBIN_ID || JSONBIN_ID === 'YOUR_BIN_ID_HERE') {
     showLoadingOverlay(false);
     showToast('⚠️ JSONBin credentials not set. Please configure app.js.');
@@ -93,7 +93,7 @@ async function cloudLoad() {
     checkSeedNeeded();
     return;
   }
-
+ 
   setSyncStatus('syncing', 'Connecting…');
   try {
     const res = await fetch(JSONBIN_URL + '/latest', {
@@ -102,14 +102,14 @@ async function cloudLoad() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
     const data = json.record;
-
+ 
     if (!data || !data.nextId) {
       // Bin exists but is empty — seed demo data and push it up
       checkSeedNeeded();
       await _pushToCloud();
     } else {
       applyData(data);
-
+ 
       // Auto-recover: create patient accounts for anyone in queue/completed
       // who doesn't have one — fixes accounts that were never properly saved
       let recovered = false;
@@ -130,7 +130,7 @@ async function cloudLoad() {
           recovered = true;
         }
       });
-
+ 
       if (recovered) {
         S.queue.sort((a,b) => new Date(a.apptDT) - new Date(b.apptDT));
         setSyncStatus('syncing', 'Recovering accounts…');
@@ -138,7 +138,7 @@ async function cloudLoad() {
         setSyncStatus('ok', 'Accounts recovered ✓');
       }
     }
-
+ 
     _syncOnline = true;
     setSyncStatus('ok', 'Live sync active');
     startPolling();
@@ -152,7 +152,7 @@ async function cloudLoad() {
     showLoadingOverlay(false);
   }
 }
-
+ 
 // ── Loading overlay ────────────────────────────────
 function showLoadingOverlay(show) {
   let el = document.getElementById('loading-overlay');
@@ -183,7 +183,7 @@ function showLoadingOverlay(show) {
     setTimeout(() => { if (el) el.style.display = 'none'; }, 350);
   }
 }
-
+ 
 // ══════════════════════════════════════════════════
 //  JSONBIN — SAVE TO CLOUD
 //  force=true  → immediate, bypasses debounce
@@ -195,7 +195,7 @@ function cloudSave(force = false) {
   clearTimeout(_syncTimer);
   _syncTimer = setTimeout(() => _pushToCloud(), 400);
 }
-
+ 
 async function _pushToCloud() {
   setSyncStatus('syncing', 'Saving…');
   try {
@@ -217,7 +217,7 @@ async function _pushToCloud() {
     setSyncStatus('error', 'Sync failed — please check connection');
   }
 }
-
+ 
 // ══════════════════════════════════════════════════
 //  POLLING — pull cloud changes every 6s
 //  Keeps admin dashboard live when patient books on phone
@@ -234,7 +234,7 @@ function startPolling() {
       const json = await res.json();
       const data = json.record;
       if (!data || !data.nextId) return;
-
+ 
       // Only update if remote nextId is ahead (means someone else wrote data)
       if (data.nextId > S.nextId || data.queue?.length !== S.queue.length || data.patients?.length !== S.patients.length) {
         applyData(data);
@@ -249,11 +249,11 @@ function startPolling() {
     } catch (e) { /* silent — don't interrupt UX on poll failure */ }
   }, 6000);
 }
-
+ 
 function stopPolling() {
   if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
 }
-
+ 
 // ══════════════════════════════════════════════════
 //  DATA HELPERS
 // ══════════════════════════════════════════════════
@@ -272,7 +272,7 @@ function buildPayload() {
     dentistStatus: S.dentistStatus,
   };
 }
-
+ 
 function applyData(data) {
   const hydrate = arr => (arr || []).map(p => ({
     ...p,
@@ -286,27 +286,27 @@ function applyData(data) {
   S.nextId        = data.nextId        || 1;
   S.dentistStatus = data.dentistStatus || 'available';
 }
-
+ 
 function checkSeedNeeded() {
   if (S.queue.length === 0 && S.completed.length === 0 && S.patients.length === 0) {
     seedDemo();
   }
 }
-
+ 
 function fmtSyncTime() {
   return new Date().toLocaleTimeString('en-PH', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
 }
-
+ 
 // Returns today's date as YYYY-MM-DD using LOCAL timezone (not UTC)
 // This prevents midnight timezone bugs where toISOString() returns yesterday
 function localToday() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
-
+ 
 // Unified save — debounced for normal interactions
 function save() { cloudSave(false); }
-
+ 
 // ══════════════════════════════════════════════════
 //  BOOT
 // ══════════════════════════════════════════════════
@@ -316,7 +316,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   injectSyncBar();
   await cloudLoad();
 });
-
+ 
 // ══════════════════════════════════════════════════
 //  PAGE NAVIGATION
 // ══════════════════════════════════════════════════
@@ -329,13 +329,13 @@ function showPage(id) {
   if (id === 'page-patient-dashboard') renderPatientDashboard();
   if (id === 'page-patient-portal')    resetPortal();
 }
-
+ 
 // ══════════════════════════════════════════════════
 //  SIDEBAR
 // ══════════════════════════════════════════════════
 function openSidebar()  { document.getElementById('sidebar').classList.add('open');    document.getElementById('sb-overlay').classList.add('open'); }
 function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); document.getElementById('sb-overlay').classList.remove('open'); }
-
+ 
 // ══════════════════════════════════════════════════
 //  PATIENT PORTAL TABS
 // ══════════════════════════════════════════════════
@@ -345,7 +345,7 @@ function resetPortal() {
   document.getElementById('si-name').value      = '';
   document.getElementById('si-err').textContent = '';
 }
-
+ 
 function switchPortalTab(tab) {
   document.getElementById('ptab-signin').classList.toggle('active',   tab==='signin');
   document.getElementById('ptab-register').classList.toggle('active', tab==='register');
@@ -354,7 +354,7 @@ function switchPortalTab(tab) {
   document.getElementById('si-err').textContent  = '';
   document.getElementById('reg-err').textContent = '';
 }
-
+ 
 // ══════════════════════════════════════════════════
 //  PATIENT SIGN IN
 // ══════════════════════════════════════════════════
@@ -363,9 +363,9 @@ async function patientSignIn() {
   const name    = document.getElementById('si-name').value.trim().toLowerCase();
   const err     = document.getElementById('si-err');
   if (!contact || !name) { err.textContent = 'Please fill in both fields.'; return; }
-
+ 
   err.textContent = '';
-
+ 
   // Always pull fresh data from cloud before checking
   if (_syncOnline) {
     try {
@@ -374,19 +374,19 @@ async function patientSignIn() {
       if (json.record?.nextId) { applyData(json.record); lsCacheWrite(); }
     } catch(e) { /* use cached data */ }
   }
-
+ 
   // Primary check — look in registered patients list
   let found = S.patients.find(p =>
     p.contact === contact && p.name.toLowerCase() === name
   );
-
+ 
   // Fallback — if not found in patients, check the queue and completed lists
   // This handles the case where an account was created before sync was working
   if (!found) {
     const inQueue     = S.queue.find(p => p.contact === contact && p.name.toLowerCase() === name);
     const inCompleted = S.completed.find(p => p.contact === contact && p.name.toLowerCase() === name);
     const match       = inQueue || inCompleted;
-
+ 
     if (match) {
       // Auto-recover — create the missing patient account from queue data
       const recovered = {
@@ -405,16 +405,16 @@ async function patientSignIn() {
       showToast('👋 Account recovered! You\'re signed back in.');
     }
   }
-
+ 
   if (!found) {
     err.textContent = 'No account found. Please check your name and contact number, or register as a new patient.';
     return;
   }
-
+ 
   currentPatient = found;
   showPage('page-patient-dashboard');
 }
-
+ 
 // ══════════════════════════════════════════════════
 //  PATIENT REGISTER
 // ══════════════════════════════════════════════════
@@ -424,12 +424,12 @@ async function patientRegister() {
   const age     = document.getElementById('reg-age').value.trim();
   const gender  = document.getElementById('reg-gender').value;
   const err     = document.getElementById('reg-err');
-
+ 
   if (!name)    { err.textContent = 'Please enter your full name.';      return; }
   if (!contact) { err.textContent = 'Please enter your contact number.'; return; }
   if (!age)     { err.textContent = 'Please enter your age.';            return; }
   if (!gender)  { err.textContent = 'Please select your gender.';        return; }
-
+ 
   // Pull latest before checking for duplicates
   if (_syncOnline) {
     try {
@@ -438,24 +438,24 @@ async function patientRegister() {
       if (json.record?.nextId) { applyData(json.record); lsCacheWrite(); }
     } catch(e) { /* use cache */ }
   }
-
+ 
   const dup = S.patients.find(p => p.contact === contact);
   if (dup) { err.textContent = 'An account with that contact number already exists. Please sign in instead.'; return; }
-
+ 
   const patient = { id: S.nextId++, name, contact, age, gender, joinedDate: new Date().toISOString().split('T')[0] };
   S.patients.push(patient);
   await _pushToCloud(); // force immediate cloud save
-
+ 
   currentPatient = patient;
   showToast(`Welcome, ${patient.name}! 🦷`);
   showPage('page-patient-dashboard');
 }
-
+ 
 // ══════════════════════════════════════════════════
 //  PATIENT LOGOUT
 // ══════════════════════════════════════════════════
 function patientLogout() { currentPatient = null; selectedSvcs.clear(); showPage('page-landing'); }
-
+ 
 // ══════════════════════════════════════════════════
 //  PATIENT DASHBOARD
 // ══════════════════════════════════════════════════
@@ -472,7 +472,7 @@ function renderPatientDashboard() {
   updateBill('pd-');
   renderPatientHistory();
 }
-
+ 
 function renderActiveAppt() {
   const el = document.getElementById('pd-active-appt');
   if (!el || !currentPatient) return;
@@ -498,7 +498,7 @@ function renderActiveAppt() {
       </div>
     </div>`;
 }
-
+ 
 function renderPatientHistory() {
   const el = document.getElementById('pd-history-list');
   if (!el || !currentPatient) return;
@@ -526,7 +526,7 @@ function renderPatientHistory() {
     </div>`;
   }).join('');
 }
-
+ 
 function switchPdTab(tab) {
   document.getElementById('pdt-book').classList.toggle('active',    tab==='book');
   document.getElementById('pdt-history').classList.toggle('active', tab==='history');
@@ -534,7 +534,7 @@ function switchPdTab(tab) {
   document.getElementById('pdt-history-panel').style.display = tab==='history' ? '' : 'none';
   if (tab==='history') renderPatientHistory();
 }
-
+ 
 // ══════════════════════════════════════════════════
 //  SERVICES GRID
 // ══════════════════════════════════════════════════
@@ -553,14 +553,14 @@ function renderServicesGrid(gridId='pd-services-grid', prefix='pd-') {
   updateBill(prefix);
   refreshTimeSlots(prefix);
 }
-
+ 
 function toggleSvc(id, prefix='pd-') {
   selectedSvcs.has(id) ? selectedSvcs.delete(id) : selectedSvcs.add(id);
   document.getElementById(`sc-${prefix}${id}`)?.classList.toggle('selected', selectedSvcs.has(id));
   updateBill(prefix);
   refreshTimeSlots(prefix);
 }
-
+ 
 function updateBill(prefix='pd-') {
   const sel    = SERVICES.filter(s => selectedSvcs.has(s.id));
   const total  = sel.reduce((a,s)=>a+s.price,0);
@@ -574,19 +574,19 @@ function updateBill(prefix='pd-') {
   document.getElementById(`${prefix}b-note`).textContent  =
     sel.filter(s=>!s.fixed).map(s=>`• ${s.name}: ${s.note}`).join('\n');
 }
-
+ 
 function setMinDate(fieldId='pd-date') {
   const d = document.getElementById(fieldId);
   if (d) d.min = localToday();
 }
-
+ 
 function resetPdSlots() {
   const sel = document.getElementById('pd-time');
   if (sel) sel.innerHTML = '<option value="">— Select services & date first —</option>';
   const si = document.getElementById('pd-slot-info');
   if (si) { si.className='slot-info'; si.style.display='none'; }
 }
-
+ 
 function refreshTimeSlots(prefix='pd-') {
   const date   = document.getElementById(`${prefix}date`)?.value;
   const sel    = document.getElementById(`${prefix}time`);
@@ -609,7 +609,7 @@ function refreshTimeSlots(prefix='pd-') {
   infoEl.textContent=`✅ ${slots.length} slot${slots.length>1?'s':''} available on ${formatDate(date)}.`;
   sel.innerHTML = slots.map(t=>`<option value="${t}">${formatTime(t)}</option>`).join('');
 }
-
+ 
 function getAvailableSlots(date, durMins) {
   const booked = S.queue.filter(p=>p.date===date);
   const slots  = [];
@@ -622,10 +622,10 @@ function getAvailableSlots(date, durMins) {
   }
   return slots;
 }
-
+ 
 function timeToMins(t) { const [h,m]=t.split(':').map(Number); return h*60+m; }
 function minsToTime(m) { return `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`; }
-
+ 
 // ══════════════════════════════════════════════════
 //  PATIENT JOIN QUEUE
 // ══════════════════════════════════════════════════
@@ -633,13 +633,13 @@ async function patientJoinQueue() {
   if (!currentPatient) return;
   const existing = S.queue.find(p => p.patientId===currentPatient.id && p.status==='waiting');
   if (existing) { showToast('⚠️ You already have an active appointment in the queue.'); return; }
-
+ 
   const date = document.getElementById('pd-date').value;
   const time = document.getElementById('pd-time').value;
   if (!date)               { showToast('Please select a date.');        return; }
   if (!time)               { showToast('Please select a time slot.');   return; }
   if (selectedSvcs.size===0) { showToast('Please select at least one service.'); return; }
-
+ 
   // Pull latest data before booking to avoid race conditions across devices
   if (_syncOnline) {
     try {
@@ -648,16 +648,16 @@ async function patientJoinQueue() {
       if (json.record?.nextId) { applyData(json.record); lsCacheWrite(); }
     } catch(e) { /* proceed with cache */ }
   }
-
+ 
   const clash = S.queue.find(p=>p.date===date && p.time===time);
   if (clash) { showToast('⚠️ That slot was just taken. Please choose another.'); refreshTimeSlots('pd-'); return; }
-
+ 
   const svcs   = SERVICES.filter(s=>selectedSvcs.has(s.id));
   const total  = svcs.reduce((a,s)=>a+s.price,0);
   const hasVar = svcs.some(s=>!s.fixed);
   const durMin = svcs.reduce((a,s)=>a+s.durMin,0);
   const durMax = svcs.reduce((a,s)=>a+s.durMax,0);
-
+ 
   const appt = {
     id:          S.nextId++,
     patientId:   currentPatient.id,
@@ -673,16 +673,16 @@ async function patientJoinQueue() {
     joinedAt:    new Date(),
     completedAt: null,
   };
-
+ 
   S.queue.push(appt);
   S.queue.sort((a,b)=>a.apptDT-b.apptDT);
   await _pushToCloud(); // immediate — don't debounce queue bookings
-
+ 
   const pos = S.queue.filter(p=>p.status==='waiting').findIndex(p=>p.id===appt.id)+1;
   showConfirmPage(appt, pos);
   startNotifTimers(appt);
 }
-
+ 
 // ══════════════════════════════════════════════════
 //  CONFIRMATION PAGE
 // ══════════════════════════════════════════════════
@@ -704,7 +704,7 @@ function showConfirmPage(appt, pos) {
   addNotifLog(log,'🔔 Reminder set',       `You'll be notified when you're next in queue.`, 'info', 900);
   showPage('page-patient-confirm');
 }
-
+ 
 function addNotifLog(container, title, body, type, delay) {
   setTimeout(()=>{
     const el = document.createElement('div');
@@ -713,7 +713,7 @@ function addNotifLog(container, title, body, type, delay) {
     container.appendChild(el);
   }, delay);
 }
-
+ 
 // ══════════════════════════════════════════════════
 //  DENTIST BANNER
 // ══════════════════════════════════════════════════
@@ -729,7 +729,7 @@ function updateDentistBanner(elId='pd-dentist-banner') {
   b.classList.add(S.dentistStatus);
   b.textContent = labels[S.dentistStatus];
 }
-
+ 
 // ══════════════════════════════════════════════════
 //  NOTIFICATION TIMERS
 // ══════════════════════════════════════════════════
@@ -744,7 +744,7 @@ function startNotifTimers(appt) {
   }, 8000);
   S.notifTimers[appt.id] = { poll };
 }
-
+ 
 function startConfirmCountdown(id) {
   const t = S.notifTimers[id] || {};
   t.followup = setTimeout(()=>{
@@ -765,7 +765,7 @@ function startConfirmCountdown(id) {
   }, 10*60*1000);
   S.notifTimers[id] = t;
 }
-
+ 
 function inAppNotif(msg) {
   showToast(msg);
   if (document.getElementById('page-admin-dashboard')?.classList.contains('active')) renderDashboard();
@@ -777,7 +777,7 @@ function clearNotifTimers(id) {
   clearInterval(S.notifTimers[id].poll);
   delete S.notifTimers[id];
 }
-
+ 
 // ══════════════════════════════════════════════════
 //  ADMIN LOGIN / LOGOUT
 // ══════════════════════════════════════════════════
@@ -791,7 +791,7 @@ function adminLogin() {
   } else { e.textContent='Invalid username or password.'; document.getElementById('a-pass').value=''; }
 }
 function adminLogout() { stopPolling(); showPage('page-landing'); }
-
+ 
 // ══════════════════════════════════════════════════
 //  ADMIN TABS
 // ══════════════════════════════════════════════════
@@ -805,7 +805,7 @@ const TAB_META = {
   'tab-followup':  { title:'Follow-up Scheduling',  sub:'Manage recommended return visits · Premium' },
   'tab-dentist':   { title:'Dentist Availability',  sub:'Set current dentist status' },
 };
-
+ 
 function switchTab(btn, tabId) {
   document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
@@ -816,7 +816,7 @@ function switchTab(btn, tabId) {
   document.getElementById('dash-sub').textContent   = m.sub;
   renderDashboard(); closeSidebar();
 }
-
+ 
 // ══════════════════════════════════════════════════
 //  RENDER DASHBOARD
 // ══════════════════════════════════════════════════
@@ -826,7 +826,7 @@ function renderDashboard() {
   renderAnalyticsTab(); renderFeedbackTab(); renderFollowupTab();
   renderDentistTab(); updateNavBadges();
 }
-
+ 
 function renderChips() {
   const w = S.queue.filter(p=>p.status==='waiting').length;
   const r = S.completed.reduce((a,p)=>a+p.total,0);
@@ -835,22 +835,22 @@ function renderChips() {
     <div class="chip"><span class="chip-n">${S.completed.length}</span><span class="chip-l">Done</span></div>
     <div class="chip"><span class="chip-n">₱${r.toLocaleString()}</span><span class="chip-l">Revenue</span></div>`;
 }
-
+ 
 function updateNavBadges() {
   document.getElementById('nb-queue').textContent = S.queue.length;
   document.getElementById('nb-done').textContent  = S.completed.length;
 }
-
+ 
 // ── Queue Tab ──────────────────────────────────────
 function renderQueueTab() {
   const el = document.getElementById('queue-list'); if (!el) return;
   if (S.queue.length===0) { el.innerHTML=emptyState('📋','No patients in queue','Patients will appear here after check-in.'); return; }
-
+ 
   // Find index of last patient scheduled for TODAY (for last-patient indicator)
   const today = localToday();
   const todayWaiting = S.queue.filter(p=>p.status==='waiting'&&p.date===today);
   const lastTodayId  = todayWaiting.length > 0 ? todayWaiting[todayWaiting.length-1].id : null;
-
+ 
   el.innerHTML = S.queue.map((p,i) => {
     const isNext   = i===0&&p.status==='waiting';
     const isLast   = p.id===lastTodayId && !p.skipped;
@@ -878,13 +878,13 @@ function renderQueueTab() {
     </div>`;
   }).join('');
 }
-
+ 
 function actionBtns(p) {
   if (p.skipped) return `<button class="btn btn-sm btn-outline" onclick="restorePatient(${p.id})">↩ Restore</button><button class="btn btn-sm btn-danger" onclick="removePatient(${p.id})">🗑</button>`;
   if (!p.paid)   return `<button class="btn btn-sm btn-gold" onclick="markPaid(${p.id})">💳 Mark Paid</button><button class="btn btn-sm btn-danger" onclick="removePatient(${p.id})">🗑</button>`;
   return `<button class="btn btn-sm" style="background:var(--teal-xlt);color:var(--teal-dk)" onclick="openReceipt(${p.id},false)">🧾 Receipt</button><button class="btn btn-sm btn-success" onclick="markCompleted(${p.id})">✅ Complete</button>`;
 }
-
+ 
 // ── Completed Tab ──────────────────────────────────
 function renderCompletedTab() {
   const el = document.getElementById('completed-list'); if (!el) return;
@@ -913,7 +913,7 @@ function renderCompletedTab() {
     </div>`;
   }).join('');
 }
-
+ 
 // ── History Tab ────────────────────────────────────
 function renderHistoryTab() {
   const wrap = document.getElementById('history-wrap'); if (!wrap) return;
@@ -929,7 +929,7 @@ function renderHistoryTab() {
     <div id="history-days"></div>`;
   renderHistoryDays(dates, byDate);
 }
-
+ 
 function applyHistoryFilter() {
   const val = document.getElementById('hist-filter')?.value;
   const byDate = {};
@@ -938,7 +938,7 @@ function applyHistoryFilter() {
   renderHistoryDays(dates, byDate);
 }
 function clearHistoryFilter() { const f=document.getElementById('hist-filter'); if(f)f.value=''; applyHistoryFilter(); }
-
+ 
 function renderHistoryDays(dates, byDate) {
   const container = document.getElementById('history-days'); if (!container) return;
   if (dates.length===0) {
@@ -983,12 +983,12 @@ function renderHistoryDays(dates, byDate) {
     </div>`;
   }).join('');
 }
-
+ 
 function toggleHistoryDay(bodyId, chevId) {
   const b=document.getElementById(bodyId); const c=document.getElementById(chevId);
   if (!b) return; const o=b.classList.toggle('open'); if(c)c.classList.toggle('open',o);
 }
-
+ 
 // ── Revenue Tab ────────────────────────────────────
 function renderRevenueTab() {
   const el = document.getElementById('rev-grid'); if (!el) return;
@@ -1009,7 +1009,7 @@ function renderRevenueTab() {
         </div>`}
     </div>`;
 }
-
+ 
 // ── Dentist Tab ────────────────────────────────────
 function renderDentistTab() {
   const el = document.getElementById('dentist-mgr'); if (!el) return;
@@ -1034,7 +1034,7 @@ function renderDentistTab() {
       ${renderTodaySchedule()}
     </div>`;
 }
-
+ 
 function renderTodaySchedule() {
   const today = localToday();
   const all   = [...S.completed.filter(p=>p.date===today), ...S.queue.filter(p=>p.date===today&&p.status==='waiting')]
@@ -1046,12 +1046,12 @@ function renderTodaySchedule() {
       <span class="rev-r-v" style="font-size:.77rem">${p.svcs.map(s=>s.icon).join('')} ${durLabel(p.durMin,p.durMax)}</span>
     </div>`).join('')}</div>`;
 }
-
+ 
 function setDentistStatus(st) {
   S.dentistStatus = st; save(); renderDentistTab();
   showToast(`Dentist status → ${st}`); updateDentistBanner('pd-dentist-banner');
 }
-
+ 
 // ══════════════════════════════════════════════════
 //  ADMIN ACTIONS
 // ══════════════════════════════════════════════════
@@ -1060,7 +1060,7 @@ function markPaid(id) {
   p.paid = true; save();
   showToast(`💳 ${p.name} marked as paid!`); renderDashboard(); broadcastToBoard();
 }
-
+ 
 function markCompleted(id) {
   const idx = S.queue.findIndex(q=>q.id===id); if (idx===-1) return;
   const p = S.queue[idx];
@@ -1070,20 +1070,20 @@ function markCompleted(id) {
   clearNotifTimers(id); save();
   showToast(`✅ ${p.name} completed!`); renderDashboard(); broadcastToBoard();
 }
-
+ 
 function removePatient(id) {
   const idx = S.queue.findIndex(q=>q.id===id); if (idx===-1) return;
   const name = S.queue[idx].name; S.queue.splice(idx,1);
   clearNotifTimers(id); save();
   showToast(`🗑 ${name} removed.`); renderDashboard(); broadcastToBoard();
 }
-
+ 
 function restorePatient(id) {
   const p = S.queue.find(q=>q.id===id); if (!p) return;
   p.skipped=false; p.status='waiting'; S.queue.sort((a,b)=>a.apptDT-b.apptDT);
   save(); showToast(`↩ ${p.name} restored.`); renderDashboard(); broadcastToBoard();
 }
-
+ 
 // ══════════════════════════════════════════════════
 //  RECEIPT
 // ══════════════════════════════════════════════════
@@ -1120,7 +1120,7 @@ function openReceipt(id, fromCompleted=false) {
 }
 function closeReceipt() { document.getElementById('receipt-overlay').classList.remove('open'); }
 function closeReceiptOnBg(e) { if (e.target===document.getElementById('receipt-overlay')) closeReceipt(); }
-
+ 
 // ══════════════════════════════════════════════════
 //  QUEUE BOARD
 // ══════════════════════════════════════════════════
@@ -1130,13 +1130,13 @@ function openQueueBoard() {
     sessionStorage.setItem('cliniq_board', JSON.stringify(buildPayload()));
     sessionStorage.setItem('cliniq_dentist', S.dentistStatus);
   } catch(e) { /* ignore */ }
-
+ 
   const win = window.open('board.html', 'CliniQ_Board', 'width=1280,height=720,scrollbars=no');
   if (!win) {
     showToast('⚠️ Please allow popups for the Queue Board.');
     return;
   }
-
+ 
   // Keep pushing fresh data to sessionStorage every 5s so board auto-updates
   const iv = setInterval(() => {
     if (win.closed) { clearInterval(iv); return; }
@@ -1146,7 +1146,7 @@ function openQueueBoard() {
     } catch(e) { /* ignore */ }
   }, 5000);
 }
-
+ 
 function broadcastToBoard() {
   // Push latest state whenever data changes so board reflects it quickly
   try {
@@ -1154,7 +1154,7 @@ function broadcastToBoard() {
     sessionStorage.setItem('cliniq_dentist', S.dentistStatus);
   } catch(e) { /* ignore */ }
 }
-
+ 
 function renderBoardInWindow(win) {
   const nowDate  = new Date();
   // Use local date string to avoid UTC timezone mismatch at midnight
@@ -1166,7 +1166,7 @@ function renderBoardInWindow(win) {
   const nowStr   = nowDate.toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'});
   const dc = {available:'#27ae60',busy:'#e67e22',unavailable:'#e05757'}[S.dentistStatus];
   const dl = {available:'🟢 Dentist Available',busy:'🟡 Dentist With Patient',unavailable:'🔴 Dentist Unavailable'}[S.dentistStatus];
-
+ 
   // Build upcoming rows — last one in today's list gets a 🔚 tag
   const upcomingRows = upcoming.map((p,i) => {
     const isLast = i === upcoming.length - 1 && waiting.length > 1;
@@ -1179,7 +1179,7 @@ function renderBoardInWindow(win) {
       <div class="utime">${formatTime(p.time)}</div>
     </div>`;
   }).join('');
-
+ 
   win.document.open();
   win.document.write(`<!DOCTYPE html>
 <html>
@@ -1197,7 +1197,7 @@ function renderBoardInWindow(win) {
     min-height:100vh;display:flex;flex-direction:column;
     overflow-x:hidden;
   }
-
+ 
   /* ── Header ── */
   .bh{
     display:flex;align-items:center;justify-content:space-between;
@@ -1206,7 +1206,7 @@ function renderBoardInWindow(win) {
   }
   .bl{font-family:'DM Serif Display',serif;font-size:clamp(1.2rem,3vw,1.7rem);display:flex;align-items:center;gap:10px}
   .bt{font-size:clamp(.85rem,2vw,1.05rem);color:rgba(255,255,255,.45);font-weight:600}
-
+ 
   /* ── Body — side by side on desktop, stacked on mobile ── */
   .bb{
     flex:1;display:grid;
@@ -1224,13 +1224,13 @@ function renderBoardInWindow(win) {
     padding:clamp(14px,2.5vw,28px) clamp(14px,2.5vw,30px);
     background:rgba(0,0,0,.12);overflow-y:auto;
   }
-
+ 
   /* ── Section label ── */
   .sl{
     font-size:clamp(.6rem,1.2vw,.75rem);font-weight:700;text-transform:uppercase;
     letter-spacing:.1em;color:rgba(255,255,255,.3);margin-bottom:clamp(10px,2vw,18px);
   }
-
+ 
   /* ── Now Serving card ── */
   .cc{
     background:linear-gradient(135deg,#1a8a78,#126b5e);
@@ -1268,7 +1268,7 @@ function renderBoardInWindow(win) {
     font-size:clamp(1.1rem,3vw,1.6rem);
     color:rgba(255,255,255,.2);text-align:center;margin:auto;
   }
-
+ 
   /* ── Upcoming rows ── */
   .ui{
     display:flex;align-items:center;gap:clamp(8px,1.5vw,14px);
@@ -1301,7 +1301,7 @@ function renderBoardInWindow(win) {
     margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   }
   .utime{font-size:clamp(.72rem,1.4vw,.85rem);color:rgba(255,255,255,.4);flex-shrink:0;font-weight:600}
-
+ 
   /* ── Footer ── */
   .bf{
     padding:clamp(8px,1.5vw,12px) clamp(16px,3vw,34px);
@@ -1312,10 +1312,10 @@ function renderBoardInWindow(win) {
   .ds{display:flex;align-items:center;gap:8px;font-size:clamp(.78rem,1.6vw,.92rem);font-weight:600;color:${dc}}
   .dot{width:10px;height:10px;border-radius:50%;background:${dc};flex-shrink:0}
   .bfr{font-size:clamp(.62rem,1.2vw,.74rem);color:rgba(255,255,255,.2)}
-
+ 
   /* ── Animations ── */
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
-
+ 
   /* ── MOBILE: stack vertically ── */
   @media(max-width:640px){
     .bb{grid-template-columns:1fr;grid-template-rows:auto auto;overflow:visible}
@@ -1326,12 +1326,12 @@ function renderBoardInWindow(win) {
 </style>
 </head>
 <body>
-
+ 
 <div class="bh">
   <div class="bl">🦷 CliniQ — Queue Display</div>
   <div class="bt">🕐 ${nowStr}</div>
 </div>
-
+ 
 <div class="bb">
   <div class="bl-l">
     <div class="sl">Now Serving</div>
@@ -1345,7 +1345,7 @@ function renderBoardInWindow(win) {
       : `<div class="cc"><div class="ec">No patients scheduled today</div></div>`
     }
   </div>
-
+ 
   <div class="bl-r">
     <div class="sl">Up Next Today${waiting.length>1?` (${waiting.length-1} remaining)`:''}</div>
     ${upcoming.length===0
@@ -1354,12 +1354,12 @@ function renderBoardInWindow(win) {
     }
   </div>
 </div>
-
+ 
 <div class="bf">
   <div class="ds"><div class="dot"></div>${dl}</div>
   <div class="bfr">Showing today's queue only · Auto-refreshes every 5s · CliniQ v6</div>
 </div>
-
+ 
 <script>
   function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
   function formatDate(d){if(!d)return'';return new Date(d+'T00:00:00').toLocaleDateString('en-PH',{year:'numeric',month:'short',day:'numeric'})}
@@ -1369,21 +1369,21 @@ function renderBoardInWindow(win) {
 </html>`);
   win.document.close();
 }
-
+ 
 // ══════════════════════════════════════════════════
 //  PREMIUM TAB RENDERERS
 // ══════════════════════════════════════════════════
-
+ 
 function renderAnalyticsTab() {
   const el = document.getElementById('analytics-grid');
   if (!el || currentTier !== 'premium') return;
-
+ 
   const today     = localToday();
   const thisMonth = today.slice(0,7);
   const allDone   = S.completed;
   const todayPts  = allDone.filter(p=>p.date===today);
   const monthPts  = allDone.filter(p=>p.date?.startsWith(thisMonth));
-
+ 
   // Peak hour
   const hourCounts = {};
   allDone.forEach(p => {
@@ -1393,20 +1393,20 @@ function renderAnalyticsTab() {
   });
   const peakHour  = Object.keys(hourCounts).sort((a,b)=>hourCounts[b]-hourCounts[a])[0];
   const peakLabel = peakHour ? formatTime(`${String(peakHour).padStart(2,'0')}:00`) : '—';
-
+ 
   // Top service
   const svcCount = {};
   allDone.forEach(p=>p.svcs.forEach(s=>{ svcCount[s.id]=(svcCount[s.id]||0)+1; }));
   const topSvcId = Object.keys(svcCount).sort((a,b)=>svcCount[b]-svcCount[a])[0];
   const topSvc   = SERVICES.find(s=>s.id===topSvcId);
-
+ 
   // Retention
   const patientVisits = {};
   allDone.forEach(p=>{ patientVisits[p.contact]=(patientVisits[p.contact]||0)+1; });
   const returning    = Object.values(patientVisits).filter(v=>v>1).length;
   const totalUnique  = Object.keys(patientVisits).length;
   const retentionPct = totalUnique ? Math.round((returning/totalUnique)*100) : 0;
-
+ 
   // ── Daily patients bar chart (last 7 days) ────────
   const days = [];
   for (let i=6; i>=0; i--) {
@@ -1436,7 +1436,7 @@ function renderAnalyticsTab() {
       ${isToday ? `<text x="${bx+barW/2}" y="${chartH+28}" text-anchor="middle"
         font-size="8" fill="#1a8a78" font-family="DM Sans,sans-serif" font-weight="700">TODAY</text>` : ''}`;
   }).join('');
-
+ 
   el.innerHTML = `
     <!-- Stat chips -->
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:4px">
@@ -1447,7 +1447,7 @@ function renderAnalyticsTab() {
       <div class="rev-card"><div class="rev-lbl">Top Service</div><div class="rev-val" style="font-size:1rem;line-height:1.3">${topSvc?topSvc.icon+' '+topSvc.name:'—'}</div></div>
       <div class="rev-card"><div class="rev-lbl">Total Served</div><div class="rev-val">${allDone.length}</div></div>
     </div>
-
+ 
     <!-- Bar chart -->
     <div class="rev-card" style="grid-column:1/-1">
       <div class="rev-lbl" style="margin-bottom:18px">📊 Patients Per Day — Last 7 Days</div>
@@ -1468,7 +1468,7 @@ function renderAnalyticsTab() {
       ${allDone.length===0?`<p style="text-align:center;color:var(--muted);font-size:.84rem;margin-top:8px">Complete some appointments to see data here.</p>`:''}
     </div>`;
 }
-
+ 
 function renderFeedbackTab() {
   const el = document.getElementById('feedback-wrap');
   if (!el || currentTier !== 'premium') return;
@@ -1477,7 +1477,7 @@ function renderFeedbackTab() {
   const avgRating = withFeedback.length
     ? (withFeedback.reduce((a,p)=>a+p.rating,0)/withFeedback.length).toFixed(1)
     : null;
-
+ 
   el.innerHTML = `
     <div style="display:flex;flex-direction:column;gap:14px">
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:4px">
@@ -1506,7 +1506,7 @@ function renderFeedbackTab() {
           </div>`).join('')}
     </div>`;
 }
-
+ 
 function renderFollowupTab() {
   const el = document.getElementById('followup-wrap');
   if (!el || currentTier !== 'premium') return;
@@ -1514,7 +1514,7 @@ function renderFollowupTab() {
   const today = localToday();
   const overdue   = withFollowup.filter(p=>p.followupDate < today);
   const upcoming  = withFollowup.filter(p=>p.followupDate >= today).sort((a,b)=>a.followupDate.localeCompare(b.followupDate));
-
+ 
   el.innerHTML = `
     <div style="display:flex;flex-direction:column;gap:16px">
       ${overdue.length > 0 ? `
@@ -1548,50 +1548,50 @@ function renderFollowupTab() {
         : ''}
     </div>`;
 }
-
+ 
 // ══════════════════════════════════════════════════
 //  FOLLOW-UP MODAL
 // ══════════════════════════════════════════════════
 let _followupPatientId = null;
-
+ 
 function openFollowup(patientId) {
   const p = S.completed.find(q=>q.id===patientId);
   if (!p) return;
   _followupPatientId = patientId;
-
+ 
   // Pre-fill if follow-up already set
   document.getElementById('followup-date-input').value  = p.followupDate || '';
   document.getElementById('followup-note-input').value  = p.followupNote || '';
   document.getElementById('followup-err').textContent   = '';
   document.getElementById('followup-date-input').min    = localToday();
-
+ 
   document.getElementById('followup-patient-info').innerHTML = `
     <strong>${esc(p.name)}</strong> &nbsp;·&nbsp; 📅 ${formatDate(p.date)}<br/>
     <span style="color:var(--muted)">${p.svcs.map(s=>s.icon+' '+s.name).join(' · ')}</span>`;
-
+ 
   document.getElementById('followup-overlay').classList.add('open');
 }
-
+ 
 function saveFollowup() {
   const date = document.getElementById('followup-date-input').value;
   const note = document.getElementById('followup-note-input').value.trim();
   const err  = document.getElementById('followup-err');
-
+ 
   if (!date) { err.textContent = 'Please select a return date.'; return; }
   if (date <= localToday()) { err.textContent = 'Follow-up date must be in the future.'; return; }
-
+ 
   const p = S.completed.find(q=>q.id===_followupPatientId);
   if (!p) return;
-
+ 
   p.followupDate = date;
   p.followupNote = note;
   save();
-
+ 
   closeFollowup();
   showToast(`📆 Follow-up set for ${p.name} on ${formatDate(date)}`);
   renderDashboard();
 }
-
+ 
 function closeFollowup() {
   document.getElementById('followup-overlay').classList.remove('open');
   _followupPatientId = null;
@@ -1599,7 +1599,7 @@ function closeFollowup() {
 function closeFollowupOnBg(e) {
   if (e.target===document.getElementById('followup-overlay')) closeFollowup();
 }
-
+ 
 // ══════════════════════════════════════════════════
 //  ABOUT MODAL
 // ══════════════════════════════════════════════════
@@ -1612,7 +1612,7 @@ function closeAbout() {
 function closeAboutOnBg(e) {
   if (e.target === document.getElementById('about-overlay')) closeAbout();
 }
-
+ 
 // ══════════════════════════════════════════════════
 //  PRICING MODAL
 // ══════════════════════════════════════════════════
@@ -1625,14 +1625,14 @@ function closePricing() {
 function closePricingOnBg(e) {
   if (e.target === document.getElementById('pricing-overlay')) closePricing();
 }
-
+ 
 // ══════════════════════════════════════════════════
 //  TIER SYSTEM
 //  currentTier: 'free' | 'premium'
 //  Toggle with the button in the sidebar for demo purposes
 // ══════════════════════════════════════════════════
 let currentTier = 'free';
-
+ 
 const PREMIUM_TABS = ['tab-history','tab-revenue','tab-analytics','tab-feedback','tab-followup'];
 const LOCK_LABELS  = {
   'tab-history':   { icon:'📅', title:'History Log',          desc:'Upgrade to Premium to access full daily patient records and dentist history.' },
@@ -1641,16 +1641,16 @@ const LOCK_LABELS  = {
   'tab-feedback':  { icon:'⭐', title:'Patient Feedback',      desc:'Upgrade to Premium to collect star ratings and comments from patients after each visit.' },
   'tab-followup':  { icon:'📆', title:'Follow-up Scheduling', desc:'Upgrade to Premium to set recommended return dates for patients and track upcoming follow-ups.' },
 };
-
+ 
 function toggleTier() {
   currentTier = currentTier === 'free' ? 'premium' : 'free';
   applyTierUI();
   showToast(currentTier === 'premium' ? '⭐ Switched to Premium Plan' : '🔒 Switched to Free Plan');
 }
-
+ 
 function applyTierUI() {
   const isPremium = currentTier === 'premium';
-
+ 
   // Tier badge in sidebar
   const badge = document.getElementById('tier-badge-wrap');
   if (badge) {
@@ -1660,7 +1660,7 @@ function applyTierUI() {
         ${isPremium ? '⭐ Premium Plan' : 'Starter Plan · Free'}
       </div>`;
   }
-
+ 
   // Toggle button text + icon
   const toggleBtn  = document.getElementById('btn-tier-toggle');
   const toggleIcon = document.getElementById('tier-toggle-icon');
@@ -1670,7 +1670,7 @@ function applyTierUI() {
     if (toggleIcon) toggleIcon.textContent = isPremium ? '🔽' : '⭐';
     if (toggleLbl)  toggleLbl.textContent  = isPremium ? 'Switch to Free Plan' : 'Switch to Premium';
   }
-
+ 
   // Nav item locks
   PREMIUM_TABS.forEach(tabId => {
     const key    = tabId.replace('tab-','');
@@ -1679,15 +1679,15 @@ function applyTierUI() {
     if (navBtn)  navBtn.classList.toggle('unlocked', isPremium);
     if (lockEl)  lockEl.style.display = isPremium ? 'none' : '';
   });
-
+ 
   // Lock/unlock premium tab content
   PREMIUM_TABS.forEach(tabId => {
     const tabEl = document.getElementById(tabId);
     if (!tabEl) return;
-    // Remove existing overlay first
+    // Remove existing overlay
     const existing = tabEl.querySelector('.lock-overlay');
     if (existing) existing.remove();
-
+ 
     if (!isPremium) {
       const info = LOCK_LABELS[tabId];
       const overlay = document.createElement('div');
@@ -1697,10 +1697,11 @@ function applyTierUI() {
         <div class="lock-title">${info.title}</div>
         <p class="lock-desc">${info.desc}</p>
         <button class="btn btn-gold" onclick="openPricing()">💎 View Premium Plans</button>`;
-      tabEl.appendChild(overlay);
+      // Insert as first child so it sits above any inner content
+      tabEl.insertBefore(overlay, tabEl.firstChild);
     }
   });
-
+ 
   // If currently on a premium tab and switched to free — jump back to queue
   const activeTab = document.querySelector('.tab.active');
   if (!isPremium && activeTab && PREMIUM_TABS.includes(activeTab.id)) {
@@ -1708,15 +1709,15 @@ function applyTierUI() {
     if (queueBtn) switchTab(queueBtn, 'tab-queue');
   }
 }
-
-
+ 
+ 
 let _tt;
 function showToast(msg) {
   const t = document.getElementById('toast');
   t.textContent=msg; t.classList.add('show');
   clearTimeout(_tt); _tt=setTimeout(()=>t.classList.remove('show'),3500);
 }
-
+ 
 // ══════════════════════════════════════════════════
 //  HELPERS
 // ══════════════════════════════════════════════════
@@ -1725,7 +1726,7 @@ function formatDate(d) { if(!d)return''; return new Date(d+'T00:00:00').toLocale
 function formatTime(t) { if(!t)return''; const[h,m]=t.split(':').map(Number); return`${h%12||12}:${String(m).padStart(2,'0')} ${h>=12?'PM':'AM'}`; }
 function durLabel(mn,mx) { const fmt=m=>m>=60?`${Math.floor(m/60)}h${m%60?` ${m%60}m`:''}`:` ${m}m`; return mn===mx?fmt(mn):`${fmt(mn)}–${fmt(mx)}`; }
 function emptyState(icon,title,desc) { return`<div class="empty-state"><span class="ei">${icon}</span><h3>${title}</h3><p>${desc}</p></div>`; }
-
+ 
 // ══════════════════════════════════════════════════
 //  DEMO DATA SEED
 // ══════════════════════════════════════════════════
@@ -1734,7 +1735,7 @@ function seedDemo() {
   const yesterday = new Date(Date.now()-86400000).toISOString().split('T')[0];
   const twoDays   = new Date(Date.now()-172800000).toISOString().split('T')[0];
   const tomorrow  = new Date(Date.now()+86400000).toISOString().split('T')[0];
-
+ 
   const demoPatients = [
     {id:S.nextId++,name:'Maria Santos',   contact:'09171234567',age:'32',gender:'Female',joinedDate:twoDays},
     {id:S.nextId++,name:'Jose Reyes',     contact:'09281234567',age:'45',gender:'Male',  joinedDate:twoDays},
@@ -1748,7 +1749,7 @@ function seedDemo() {
     {id:S.nextId++,name:'Josie Tan',      contact:'09881234567',age:'26',gender:'Female',joinedDate:twoDays},
   ];
   S.patients.push(...demoPatients);
-
+ 
   function book(contact, date, sids, completed=false) {
     const pt = demoPatients.find(p=>p.contact===contact); if (!pt) return;
     const svcs   = SERVICES.filter(s=>sids.includes(s.id));
@@ -1767,7 +1768,7 @@ function seedDemo() {
     pool.push({id:S.nextId++,patientId:pt.id,name:pt.name,contact:pt.contact,date,time,apptDT:new Date(`${date}T${time}`),svcs,total,hasVar,durMin,durMax,paid:completed,status:completed?'completed':'waiting',confirmed:false,skipped:false,joinedAt:new Date(),completedAt:completed?new Date():null});
     if (!completed) S.queue.sort((a,b)=>a.apptDT-b.apptDT);
   }
-
+ 
   book('09881234567',twoDays,   ['s6'],       true);
   book('09441234567',twoDays,   ['s5'],       true);
   book('09171234567',twoDays,   ['s1'],       true);
@@ -1780,6 +1781,7 @@ function seedDemo() {
   book('09991234567',today,     ['s2'],       false);
   book('09451234567',today,     ['s7'],       false);
   book('09651234567',tomorrow,  ['s8'],       false);
-
+ 
   save();
 }
+ 

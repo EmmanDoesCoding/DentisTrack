@@ -702,16 +702,22 @@ body{font-family:var(--fb);background:var(--cream);color:var(--navy);min-height:
 /* ── Lock overlay ───────────────────────────────── */
 .premium-tab { position: relative; }
 .lock-overlay {
-  position: absolute; inset: 0;
-  background: rgba(13,43,38,.8);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
-  gap: 14px; z-index: 10;
-  text-align: center; padding: 32px;
+  gap: 16px;
+  text-align: center;
+  padding: 60px 32px;
+  background: linear-gradient(160deg, rgba(13,43,38,.92), rgba(18,107,94,.85));
+  border-radius: var(--r-xl);
+  margin: 0 0 24px;
+  border: 1px solid rgba(26,138,120,.2);
+  box-shadow: var(--sh-md);
   animation: fadeUp .3s ease both;
+  min-height: 360px;
 }
-.lock-icon  { font-size: 3.2rem; }
-.lock-title { font-family: var(--fd); font-size: 1.7rem; color: #fff; }
-.lock-desc  { font-size: .87rem; color: rgba(255,255,255,.58); max-width: 300px; line-height: 1.65; }
+.lock-icon  { font-size: 3.5rem; }
+.lock-title { font-family: var(--fd); font-size: 1.9rem; color: #fff; }
+.lock-desc  {
+  font-size: .9rem; color: rgba(255,255,255,.6);
+  max-width: 320px; line-height: 1.7;
+}
