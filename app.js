@@ -917,6 +917,7 @@ function renderCompletedTab() {
 // ── History Tab ────────────────────────────────────
 function renderHistoryTab() {
   const wrap = document.getElementById('history-wrap'); if (!wrap) return;
+  if (currentTier !== 'premium') { wrap.innerHTML = ''; return; }
   const byDate = {};
   S.completed.forEach(p=>{ if(!byDate[p.date])byDate[p.date]=[]; byDate[p.date].push(p); });
   const dates = Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
@@ -992,6 +993,7 @@ function toggleHistoryDay(bodyId, chevId) {
 // ── Revenue Tab ────────────────────────────────────
 function renderRevenueTab() {
   const el = document.getElementById('rev-grid'); if (!el) return;
+  if (currentTier !== 'premium') { el.innerHTML = ''; return; }
   const total  = S.completed.reduce((a,p)=>a+p.total,0);
   const avg    = S.completed.length ? Math.round(total/S.completed.length) : 0;
   const svcRev={}, svcCnt={};
@@ -1784,4 +1786,4 @@ function seedDemo() {
  
   save();
 }
- 
+  
