@@ -464,6 +464,7 @@ function renderPatientDashboard() {
   document.getElementById('pd-greeting').textContent = `Hello, ${currentPatient.name}! 👋`;
   document.getElementById('pd-sub').textContent = `${currentPatient.age ? currentPatient.age + ' yrs · ' : ''}${currentPatient.gender || ''} · Member since ${formatDate(currentPatient.joinedDate)}`;
   updateDentistBanner('pd-dentist-banner');
+  renderFollowupBanner();
   renderActiveAppt();
   selectedSvcs.clear();
   renderServicesGrid('pd-services-grid', 'pd-');
@@ -471,6 +472,125 @@ function renderPatientDashboard() {
   resetPdSlots();
   updateBill('pd-');
   renderPatientHistory();
+}
+ 
+// ── Follow-up Banner ─────────────────────────────
+// Shows when the dentist has set a recommended return date for this patient
+function renderFollowupBanner() {
+  // Find or create the banner element
+  let banner = document.getElementById('pd-followup-banner');
+  if (!banner) {
+    // Insert it just before the pd-active-appt div
+    const activeAppt = document.getElementById('pd-active-appt');
+    if (!activeAppt) return;
+    banner = document.createElement('div');
+    banner.id = 'pd-followup-banner';
+    activeAppt.parentNode.insertBefore(banner, activeAppt);
+  }
+ 
+  if (!currentPatient) { banner.innerHTML = ''; return; }
+ 
+  // Find the most recent completed appointment for this patient that has a follow-up date
+  const withFollowup = S.completed
+    .filter(p => p.patientId === currentPatient.id && p.followupDate)
+    .sort((a,b) => b.followupDate.localeCompare(a.followupDate));
+ 
+  if (withFollowup.length === 0) { banner.innerHTML = ''; return; }
+ 
+  const latest   = withFollowup[0];
+  const today    = localToday();
+  const isOverdue = latest.followupDate < today;
+  const daysUntil = Math.ceil((new Date(latest.followupDate) - new Date(today)) / 86400000);
+ 
+  // Don't show if they already have an active booking
+  const hasActive = S.queue.find(p => p.patientId === currentPatient.id && p.status === 'waiting');
+  if (hasActive) { banner.innerHTML = ''; return; }
+ 
+  const urgencyColor = isOverdue ? 'var(--danger)'  : daysUntil <= 7 ? 'var(--warn)'  : 'var(--teal)';
+  const urgencyBg    = isOverdue ? 'var(--danger-bg)': daysUntil <= 7 ? 'var(--warn-bg)': 'var(--teal-xlt)';
+  const urgencyIcon  = isOverdue ? '⚠️' : daysUntil <= 7 ? '🔔' : '📆';
+  const urgencyMsg   = isOverdue
+    ? `Your follow-up was recommended for ${formatDate(latest.followupDate)}. Please book as soon as possible.`
+    : daysUntil === 0
+      ? `Your dentist recommends a follow-up today.`
+      : daysUntil <= 7
+        ? `Your dentist recommends a follow-up in ${daysUntil} day${daysUntil>1?'s':''}  (by ${formatDate(latest.followupDate)}).`
+        : `Your dentist recommends a follow-up by ${formatDate(latest.followupDate)}.`;
+ 
+  banner.innerHTML = `
+    <div style="
+      background:${urgencyBg};
+      border:1.5px solid ${urgencyColor};
+      border-radius:var(--r-lg);
+      padding:16px 18px;
+      margin-bottom:14px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      flex-wrap:wrap;
+      gap:12px;
+      animation:fadeUp .4s ease both;
+    ">
+      <div style="display:flex;align-items:flex-start;gap:12px;flex:1;min-width:0">
+        <span style="font-size:1.5rem;flex-shrink:0">${urgencyIcon}</span>
+        <div>
+          <div style="font-weight:700;font-size:.92rem;color:${urgencyColor};margin-bottom:3px">
+            Dentist Recommended Follow-up
+          </div>
+          <div style="font-size:.83rem;color:var(--slate);line-height:1.5">${urgencyMsg}</div>
+          ${latest.followupNote ? `<div style="font-size:.78rem;color:var(--muted);margin-top:4px">📝 ${esc(latest.followupNote)}</div>` : ''}
+        </div>
+      </div>
+      <button class="btn btn-primary btn-sm"
+              style="flex-shrink:0;white-space:nowrap"
+              onclick="bookFollowupAppointment('${latest.id}','${latest.followupDate}')">
+        📅 Book Follow-up
+      </button>
+    </div>`;
+}
+ 
+// ── Pre-fill booking form from follow-up ─────────
+function bookFollowupAppointment(completedId, suggestedDate) {
+  const completed = S.completed.find(p => p.id === parseInt(completedId));
+ 
+  // Switch to the Book tab
+  switchPdTab('book');
+ 
+  // Pre-select the same services from their last visit
+  selectedSvcs.clear();
+  if (completed) {
+    completed.svcs.forEach(s => selectedSvcs.add(s.id));
+  }
+ 
+  // Re-render services grid with pre-selections
+  renderServicesGrid('pd-services-grid', 'pd-');
+ 
+  // Pre-fill the date with the suggested follow-up date
+  // (but only if it's in the future — otherwise use today)
+  const today = localToday();
+  const dateToUse = suggestedDate >= today ? suggestedDate : today;
+  const dateInput = document.getElementById('pd-date');
+  if (dateInput) {
+    dateInput.value = dateToUse;
+    // Trigger slot refresh
+    refreshTimeSlots('pd-');
+  }
+ 
+  // Update bill
+  updateBill('pd-');
+ 
+  // Show a helpful tip in the slot info
+  const infoEl = document.getElementById('pd-slot-info');
+  if (infoEl && suggestedDate < today) {
+    infoEl.className = 'slot-info warn';
+    infoEl.style.display = 'block';
+    infoEl.textContent = `⚠️ Your recommended follow-up date has passed. We've set today as the starting date — feel free to pick any available date.`;
+  }
+ 
+  // Scroll booking form into view smoothly
+  document.getElementById('pdt-book-panel')?.scrollIntoView({ behavior:'smooth', block:'start' });
+ 
+  showToast('📅 Services from your last visit pre-selected. Choose a date and time!');
 }
  
 function renderActiveAppt() {
@@ -523,6 +643,11 @@ function renderPatientHistory() {
       <div class="ph-row"><span class="ph-label">Appointment Time</span><span class="ph-val">${formatTime(p.time)}</span></div>
       <div class="ph-row"><span class="ph-label">Duration</span><span class="ph-val">${durLabel(p.durMin,p.durMax)}</span></div>
       <div class="ph-row"><span class="ph-label">Amount Paid</span><span class="ph-val ph-total">${amt}</span></div>
+      ${p.followupDate ? `
+      <div class="ph-row" style="border-top:1px solid var(--mint);margin-top:4px;padding-top:8px">
+        <span class="ph-label" style="color:var(--teal)">📆 Dentist Follow-up</span>
+        <span class="ph-val" style="color:var(--teal)">${formatDate(p.followupDate)}${p.followupNote?' · '+esc(p.followupNote):''}</span>
+      </div>` : ''}
     </div>`;
   }).join('');
 }
@@ -1786,4 +1911,4 @@ function seedDemo() {
  
   save();
 }
-  
+ 
