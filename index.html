@@ -41,11 +41,18 @@
       </button>
     </div>
     <p class="landing-hours">Mon – Sat &nbsp;·&nbsp; 8:00 AM – 5:00 PM</p>
+
+    <!-- About + Pricing buttons at bottom -->
+    <div class="landing-footer-btns">
+      <button class="btn-text" onclick="openAbout()">ℹ️ About CliniQ</button>
+      <span class="footer-sep">·</span>
+      <button class="btn-text" onclick="openPricing()">💎 View Plans</button>
+    </div>
   </div>
 </div>
 
 <!-- ══════════════════════════════════════════
-     PATIENT PORTAL (login / register chooser)
+     PATIENT PORTAL
 ══════════════════════════════════════════ -->
 <div id="page-patient-portal" class="page">
   <div class="auth-wrap">
@@ -56,7 +63,7 @@
       <p class="auth-sub">Sign in to manage your appointments, or register as a new patient.</p>
 
       <div class="portal-tabs">
-        <button class="ptab active" id="ptab-signin" onclick="switchPortalTab('signin')">Sign In</button>
+        <button class="ptab active" id="ptab-signin"   onclick="switchPortalTab('signin')">Sign In</button>
         <button class="ptab"        id="ptab-register" onclick="switchPortalTab('register')">New Patient</button>
       </div>
 
@@ -112,7 +119,7 @@
 </div>
 
 <!-- ══════════════════════════════════════════
-     PATIENT DASHBOARD (after login)
+     PATIENT DASHBOARD
 ══════════════════════════════════════════ -->
 <div id="page-patient-dashboard" class="page">
   <div class="auth-wrap wide">
@@ -125,25 +132,19 @@
     </div>
 
     <div class="dentist-banner" id="pd-dentist-banner"></div>
-
-    <!-- Active appointment card -->
     <div id="pd-active-appt"></div>
 
-    <!-- Tabs -->
     <div class="pd-tabs">
       <button class="pd-tab active" id="pdt-book"    onclick="switchPdTab('book')">📅 Book Appointment</button>
       <button class="pd-tab"        id="pdt-history" onclick="switchPdTab('history')">🕐 My History</button>
     </div>
 
-    <!-- BOOK TAB -->
     <div id="pdt-book-panel" class="pd-panel">
       <div class="auth-card" style="box-shadow:none;border:1.5px solid var(--mint);padding:22px 18px">
-
         <div class="form-group">
           <label>Select Services <span class="label-hint">(pick first, then date)</span></label>
           <div class="services-grid" id="pd-services-grid"></div>
         </div>
-
         <div class="form-row-2">
           <div class="form-group">
             <label>Preferred Date</label>
@@ -156,9 +157,7 @@
             </select>
           </div>
         </div>
-
         <div class="slot-info" id="pd-slot-info"></div>
-
         <div class="bill-box">
           <div class="bill-row"><span>Services Selected</span><span id="pd-b-count">0</span></div>
           <div class="bill-row"><span>Est. Duration</span><span id="pd-b-dur">—</span></div>
@@ -166,12 +165,10 @@
           <div class="bill-row bill-total"><span>Estimated Total</span><span id="pd-b-total">₱0</span></div>
           <p class="bill-note" id="pd-b-note"></p>
         </div>
-
         <button class="btn btn-primary btn-full" onclick="patientJoinQueue()">Join Queue 🦷</button>
       </div>
     </div>
 
-    <!-- HISTORY TAB -->
     <div id="pdt-history-panel" class="pd-panel" style="display:none">
       <div id="pd-history-list"></div>
     </div>
@@ -235,7 +232,12 @@
       <div class="sidebar-logo"><span>🦷</span><span>CliniQ</span></div>
       <button class="sidebar-close" onclick="closeSidebar()">✕</button>
     </div>
+
+    <!-- Tier badge -->
+    <div class="tier-badge-wrap" id="tier-badge-wrap"></div>
+
     <nav class="sidebar-nav">
+      <!-- Free tier tabs -->
       <button class="nav-item active" data-tab="tab-queue" onclick="switchTab(this,'tab-queue')">
         <span class="ni-icon">📋</span><span>Queue</span>
         <span class="nav-badge" id="nb-queue">0</span>
@@ -244,18 +246,37 @@
         <span class="ni-icon">✅</span><span>Completed</span>
         <span class="nav-badge" id="nb-done">0</span>
       </button>
-      <button class="nav-item" data-tab="tab-history" onclick="switchTab(this,'tab-history')">
-        <span class="ni-icon">📅</span><span>History Log</span>
-      </button>
-      <button class="nav-item" data-tab="tab-revenue" onclick="switchTab(this,'tab-revenue')">
-        <span class="ni-icon">💰</span><span>Revenue</span>
-      </button>
       <button class="nav-item" data-tab="tab-dentist" onclick="switchTab(this,'tab-dentist')">
         <span class="ni-icon">👨‍⚕️</span><span>Dentist</span>
       </button>
+
+      <!-- Premium-only tabs -->
+      <div class="nav-section-label">Premium Features</div>
+      <button class="nav-item nav-premium" data-tab="tab-history" onclick="switchTab(this,'tab-history')">
+        <span class="ni-icon">📅</span><span>History Log</span>
+        <span class="nav-lock" id="nl-history">🔒</span>
+      </button>
+      <button class="nav-item nav-premium" data-tab="tab-revenue" onclick="switchTab(this,'tab-revenue')">
+        <span class="ni-icon">💰</span><span>Revenue</span>
+        <span class="nav-lock" id="nl-revenue">🔒</span>
+      </button>
+      <button class="nav-item nav-premium" data-tab="tab-analytics" onclick="switchTab(this,'tab-analytics')">
+        <span class="ni-icon">📊</span><span>Analytics</span>
+        <span class="nav-lock" id="nl-analytics">🔒</span>
+      </button>
+      <button class="nav-item nav-premium" data-tab="tab-feedback" onclick="switchTab(this,'tab-feedback')">
+        <span class="ni-icon">⭐</span><span>Feedback</span>
+        <span class="nav-lock" id="nl-feedback">🔒</span>
+      </button>
+      <button class="nav-item nav-premium" data-tab="tab-followup" onclick="switchTab(this,'tab-followup')">
+        <span class="ni-icon">📆</span><span>Follow-ups</span>
+        <span class="nav-lock" id="nl-followup">🔒</span>
+      </button>
     </nav>
+
     <div class="sidebar-bottom">
       <button class="btn-board" onclick="openQueueBoard()">📺 Queue Board</button>
+      <button class="btn-tier-toggle" id="btn-tier-toggle" onclick="toggleTier()">⬆️ Switch to Premium</button>
       <button class="sidebar-logout" onclick="adminLogout()">⬅ Logout</button>
     </div>
   </aside>
@@ -272,12 +293,148 @@
       <div class="dash-chips" id="dash-chips"></div>
     </header>
 
+    <!-- Free tabs -->
     <div id="tab-queue"     class="tab active"><div class="queue-list" id="queue-list"></div></div>
     <div id="tab-completed" class="tab">       <div class="queue-list" id="completed-list"></div></div>
-    <div id="tab-history"   class="tab">       <div class="history-wrap" id="history-wrap"></div></div>
-    <div id="tab-revenue"   class="tab">       <div class="rev-grid" id="rev-grid"></div></div>
     <div id="tab-dentist"   class="tab">       <div class="dentist-mgr" id="dentist-mgr"></div></div>
+
+    <!-- Premium tabs — each has a lock overlay injected by JS when on free tier -->
+    <div id="tab-history"   class="tab premium-tab"><div class="history-wrap" id="history-wrap"></div></div>
+    <div id="tab-revenue"   class="tab premium-tab"><div class="rev-grid" id="rev-grid"></div></div>
+    <div id="tab-analytics" class="tab premium-tab"><div class="analytics-grid" id="analytics-grid"></div></div>
+    <div id="tab-feedback"  class="tab premium-tab"><div class="feedback-wrap" id="feedback-wrap"></div></div>
+    <div id="tab-followup"  class="tab premium-tab"><div class="followup-wrap" id="followup-wrap"></div></div>
   </main>
+</div>
+
+<!-- ══════════════════════════════════════════
+     ABOUT MODAL
+══════════════════════════════════════════ -->
+<div class="modal-overlay" id="about-overlay" onclick="closeAboutOnBg(event)">
+  <div class="modal-box about-modal-box">
+
+    <div class="about-header">
+      <span class="about-logo-icon">🦷</span>
+      <h2 class="about-logo-name">CliniQ</h2>
+      <p class="about-version">v1.0 · Smart Dental Queue System</p>
+    </div>
+
+    <p class="about-desc">
+      CliniQ is a modern dental clinic queue management system designed to eliminate waiting room chaos.
+      Patients can book appointments, track their queue position, and view their visit history — all from their phone.
+      Clinic staff get a real-time dashboard with queue management, revenue tracking, and dentist availability controls.
+    </p>
+
+    <div class="about-divider"></div>
+
+    <div class="about-team-title">👥 Built by</div>
+    <div class="about-team">
+      <!-- ── SLOT 1 ── -->
+      <div class="about-member">
+        <div class="about-avatar">👤</div>
+        <div class="about-member-info">
+          <div class="about-member-name">Christian Daniel Rocero</div>
+          <div class="about-member-role">Chief Executive Officer & Programmer</div>
+        </div>
+      </div>
+      <!-- ── SLOT 2 ── -->
+      <div class="about-member">
+        <div class="about-avatar">👤</div>
+        <div class="about-member-info">
+          <div class="about-member-name">John Justine Martinez</div>
+          <div class="about-member-role">Sales Manager</div>
+        </div>
+      </div>
+      <!-- ── SLOT 3 ── -->
+      <div class="about-member">
+        <div class="about-avatar">👤</div>
+        <div class="about-member-info">
+          <div class="about-member-name">Ashiah Rufaelle De Castro</div>
+          <div class="about-member-role">Socials Manager</div>
+        </div>
+      </div>
+      <!-- ── SLOT 4 ── -->
+      <div class="about-member">
+        <div class="about-avatar">👤</div>
+        <div class="about-member-info">
+          <div class="about-member-name">Christel Marqueses</div>
+          <div class="about-member-role">Customer Relations Manager</div>
+        </div>
+      </div>
+      <!-- ── SLOT 5 ── -->
+      <div class="about-member">
+        <div class="about-avatar">👤</div>
+        <div class="about-member-info">
+          <div class="about-member-name">Manuel Jhon Delos Reyes</div>
+          <div class="about-member-role">Operations Manager</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="about-divider"></div>
+    <p class="about-footer">Made with 🦷 for Technopreneurship · 2026</p>
+    <button class="btn btn-primary btn-full" onclick="closeAbout()" style="margin-top:18px">Close</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     PRICING MODAL
+══════════════════════════════════════════ -->
+<div class="modal-overlay" id="pricing-overlay" onclick="closePricingOnBg(event)">
+  <div class="modal-box pricing-modal-box">
+
+    <h2 class="pricing-title">🦷 CliniQ Plans</h2>
+    <p class="pricing-sub">Choose the plan that fits your clinic.</p>
+
+    <div class="pricing-grid">
+
+      <!-- FREE -->
+      <div class="plan-card">
+        <div class="plan-name">Starter</div>
+        <div class="plan-price">Free</div>
+        <div class="plan-period">Forever</div>
+        <ul class="plan-features">
+          <li>✅ Queue management</li>
+          <li>✅ Up to 20 patients/day</li>
+          <li>✅ Smart scheduling</li>
+          <li>✅ Queue Display Board</li>
+          <li>✅ Dentist availability</li>
+          <li>✅ Receipt printing</li>
+          <li>✅ Patient check-in</li>
+          <li class="plan-no">❌ History Log</li>
+          <li class="plan-no">❌ Revenue tracking</li>
+          <li class="plan-no">❌ Analytics</li>
+          <li class="plan-no">❌ Patient feedback</li>
+          <li class="plan-no">❌ Follow-up scheduling</li>
+        </ul>
+        <button class="btn btn-outline btn-full">Current Plan</button>
+      </div>
+
+      <!-- PREMIUM -->
+      <div class="plan-card plan-card-premium">
+        <div class="plan-badge">⭐ Most Popular</div>
+        <div class="plan-name">Premium</div>
+        <div class="plan-price">₱999</div>
+        <div class="plan-period">per month</div>
+        <ul class="plan-features">
+          <li>✅ Everything in Starter</li>
+          <li>✅ <strong>Unlimited</strong> patients/day</li>
+          <li>✅ History Log</li>
+          <li>✅ Revenue Overview</li>
+          <li>✅ Analytics Dashboard</li>
+          <li>✅ Patient Feedback & Ratings</li>
+          <li>✅ Follow-up Scheduling</li>
+          <li>✅ Data Export (CSV)</li>
+          <li>✅ Multiple dentist profiles</li>
+          <li>✅ Priority support</li>
+        </ul>
+        <button class="btn btn-primary btn-full" onclick="closePricing();openAbout()">Get Started</button>
+      </div>
+
+    </div>
+
+    <button class="btn btn-outline btn-full" onclick="closePricing()" style="margin-top:16px">Close</button>
+  </div>
 </div>
 
 <!-- RECEIPT MODAL -->

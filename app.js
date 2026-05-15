@@ -325,7 +325,7 @@ function showPage(id) {
   const pg = document.getElementById(id);
   if (!pg) return;
   pg.classList.add('active');
-  if (id === 'page-admin-dashboard')   { injectSyncBar(); renderDashboard(); }
+  if (id === 'page-admin-dashboard')   { injectSyncBar(); renderDashboard(); applyTierUI(); }
   if (id === 'page-patient-dashboard') renderPatientDashboard();
   if (id === 'page-patient-portal')    resetPortal();
 }
@@ -798,9 +798,12 @@ function adminLogout() { stopPolling(); showPage('page-landing'); }
 const TAB_META = {
   'tab-queue':     { title:'Queue Management',    sub:'Active patients sorted by appointment time' },
   'tab-completed': { title:'Completed Patients',   sub:'Paid & treated patients' },
-  'tab-history':   { title:'History Log',          sub:'Daily patient & dentist records' },
-  'tab-revenue':   { title:'Revenue Overview',     sub:'Earnings from completed appointments' },
-  'tab-dentist':   { title:'Dentist Availability', sub:'Set current dentist status' },
+  'tab-history':   { title:'History Log',          sub:'Daily patient & dentist records · Premium' },
+  'tab-revenue':   { title:'Revenue Overview',     sub:'Earnings from completed appointments · Premium' },
+  'tab-analytics': { title:'Analytics Dashboard',  sub:'Clinic performance insights · Premium' },
+  'tab-feedback':  { title:'Patient Feedback',      sub:'Ratings and comments from patients · Premium' },
+  'tab-followup':  { title:'Follow-up Scheduling',  sub:'Manage recommended return visits · Premium' },
+  'tab-dentist':   { title:'Dentist Availability',  sub:'Set current dentist status' },
 };
 
 function switchTab(btn, tabId) {
@@ -808,7 +811,7 @@ function switchTab(btn, tabId) {
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById(tabId)?.classList.add('active');
-  const m = TAB_META[tabId];
+  const m = TAB_META[tabId] || { title: tabId, sub: '' };
   document.getElementById('dash-title').textContent = m.title;
   document.getElementById('dash-sub').textContent   = m.sub;
   renderDashboard(); closeSidebar();
@@ -819,7 +822,9 @@ function switchTab(btn, tabId) {
 // ══════════════════════════════════════════════════
 function renderDashboard() {
   renderChips(); renderQueueTab(); renderCompletedTab();
-  renderHistoryTab(); renderRevenueTab(); renderDentistTab(); updateNavBadges();
+  renderHistoryTab(); renderRevenueTab();
+  renderAnalyticsTab(); renderFeedbackTab(); renderFollowupTab();
+  renderDentistTab(); updateNavBadges();
 }
 
 function renderChips() {
@@ -1359,8 +1364,242 @@ function renderBoardInWindow(win) {
 }
 
 // ══════════════════════════════════════════════════
-//  TOAST
+//  PREMIUM TAB RENDERERS
 // ══════════════════════════════════════════════════
+
+function renderAnalyticsTab() {
+  const el = document.getElementById('analytics-grid');
+  if (!el || currentTier !== 'premium') return;
+  const today    = localToday();
+  const thisMonth = today.slice(0,7);
+  const allDone  = S.completed;
+  const todayPts = allDone.filter(p=>p.date===today);
+  const monthPts = allDone.filter(p=>p.date?.startsWith(thisMonth));
+
+  // Peak hour calculation
+  const hourCounts = {};
+  allDone.forEach(p => {
+    if (!p.time) return;
+    const h = parseInt(p.time.split(':')[0]);
+    hourCounts[h] = (hourCounts[h]||0) + 1;
+  });
+  const peakHour = Object.keys(hourCounts).sort((a,b)=>hourCounts[b]-hourCounts[a])[0];
+  const peakLabel = peakHour
+    ? formatTime(`${String(peakHour).padStart(2,'0')}:00`)
+    : '—';
+
+  // Top service
+  const svcCount = {};
+  allDone.forEach(p=>p.svcs.forEach(s=>{ svcCount[s.id]=(svcCount[s.id]||0)+1; }));
+  const topSvcId = Object.keys(svcCount).sort((a,b)=>svcCount[b]-svcCount[a])[0];
+  const topSvc   = SERVICES.find(s=>s.id===topSvcId);
+
+  // Returning patients (appeared more than once in completed)
+  const patientVisits = {};
+  allDone.forEach(p=>{ patientVisits[p.contact]=(patientVisits[p.contact]||0)+1; });
+  const returning = Object.values(patientVisits).filter(v=>v>1).length;
+  const retentionPct = allDone.length
+    ? Math.round((returning / Object.keys(patientVisits).length)*100)
+    : 0;
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px">
+      <div class="rev-card hl"><div class="rev-lbl">Today's Patients</div><div class="rev-val">${todayPts.length}</div></div>
+      <div class="rev-card"><div class="rev-lbl">This Month</div><div class="rev-val">${monthPts.length}</div></div>
+      <div class="rev-card"><div class="rev-lbl">Patient Retention</div><div class="rev-val">${retentionPct}%</div></div>
+      <div class="rev-card"><div class="rev-lbl">Peak Hour</div><div class="rev-val" style="font-size:1.4rem">${peakLabel}</div></div>
+      <div class="rev-card"><div class="rev-lbl">Most Popular Service</div><div class="rev-val" style="font-size:1.2rem">${topSvc ? topSvc.icon+' '+topSvc.name : '—'}</div></div>
+      <div class="rev-card"><div class="rev-lbl">Total Patients Served</div><div class="rev-val">${allDone.length}</div></div>
+    </div>`;
+}
+
+function renderFeedbackTab() {
+  const el = document.getElementById('feedback-wrap');
+  if (!el || currentTier !== 'premium') return;
+  // Get completed patients with feedback
+  const withFeedback = S.completed.filter(p=>p.rating);
+  const avgRating = withFeedback.length
+    ? (withFeedback.reduce((a,p)=>a+p.rating,0)/withFeedback.length).toFixed(1)
+    : null;
+
+  el.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:4px">
+        <div class="rev-card hl">
+          <div class="rev-lbl">Average Rating</div>
+          <div class="rev-val">${avgRating ? '⭐ '+avgRating : '—'}</div>
+        </div>
+        <div class="rev-card">
+          <div class="rev-lbl">Reviews Received</div>
+          <div class="rev-val">${withFeedback.length}</div>
+        </div>
+      </div>
+      ${withFeedback.length === 0
+        ? `<div class="empty-state"><span class="ei">⭐</span><h3>No feedback yet</h3><p>Patient ratings appear here after visits are completed.</p></div>`
+        : withFeedback.slice().reverse().map(p=>`
+          <div class="q-card">
+            <div class="q-info">
+              <div class="q-name">${esc(p.name)}</div>
+              <div class="q-svcs">${p.svcs.map(s=>s.icon+' '+s.name).join(' · ')}</div>
+              <div class="q-meta">📅 ${formatDate(p.date)}</div>
+              ${p.comment ? `<div class="q-meta" style="color:var(--slate);margin-top:4px">"${esc(p.comment)}"</div>` : ''}
+            </div>
+            <div class="q-right">
+              <div style="font-size:1.3rem">${'⭐'.repeat(p.rating)}${'☆'.repeat(5-p.rating)}</div>
+            </div>
+          </div>`).join('')}
+    </div>`;
+}
+
+function renderFollowupTab() {
+  const el = document.getElementById('followup-wrap');
+  if (!el || currentTier !== 'premium') return;
+  const withFollowup = S.completed.filter(p=>p.followupDate);
+  const today = localToday();
+  const overdue   = withFollowup.filter(p=>p.followupDate < today);
+  const upcoming  = withFollowup.filter(p=>p.followupDate >= today).sort((a,b)=>a.followupDate.localeCompare(b.followupDate));
+
+  el.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:16px">
+      ${overdue.length > 0 ? `
+        <div>
+          <div class="rev-th" style="color:var(--danger);margin-bottom:10px">⚠️ Overdue Follow-ups (${overdue.length})</div>
+          ${overdue.map(p=>`
+            <div class="q-card" style="border-color:var(--danger-bg)">
+              <div class="q-num" style="background:var(--danger-bg);color:var(--danger);border-color:var(--danger)">!</div>
+              <div class="q-info">
+                <div class="q-name">${esc(p.name)}</div>
+                <div class="q-svcs">${p.svcs.map(s=>s.icon+' '+s.name).join(' · ')}</div>
+                <div class="q-meta">Follow-up was: 📅 ${formatDate(p.followupDate)} · 📞 ${esc(p.contact)}</div>
+              </div>
+            </div>`).join('')}
+        </div>` : ''}
+      ${upcoming.length > 0 ? `
+        <div>
+          <div class="rev-th" style="margin-bottom:10px">📆 Upcoming Follow-ups (${upcoming.length})</div>
+          ${upcoming.map(p=>`
+            <div class="q-card">
+              <div class="q-num" style="background:var(--teal-xlt);color:var(--teal-dk);border-color:var(--mint)">📅</div>
+              <div class="q-info">
+                <div class="q-name">${esc(p.name)}</div>
+                <div class="q-svcs">${p.svcs.map(s=>s.icon+' '+s.name).join(' · ')}</div>
+                <div class="q-meta">Scheduled: ${formatDate(p.followupDate)} · 📞 ${esc(p.contact)}</div>
+              </div>
+            </div>`).join('')}
+        </div>` : ''}
+      ${withFollowup.length === 0
+        ? `<div class="empty-state"><span class="ei">📆</span><h3>No follow-ups scheduled</h3><p>Set a recommended return date when completing a patient to see it here.</p></div>`
+        : ''}
+    </div>`;
+}
+
+// ══════════════════════════════════════════════════
+//  ABOUT MODAL
+// ══════════════════════════════════════════════════
+function openAbout() {
+  document.getElementById('about-overlay').classList.add('open');
+}
+function closeAbout() {
+  document.getElementById('about-overlay').classList.remove('open');
+}
+function closeAboutOnBg(e) {
+  if (e.target === document.getElementById('about-overlay')) closeAbout();
+}
+
+// ══════════════════════════════════════════════════
+//  PRICING MODAL
+// ══════════════════════════════════════════════════
+function openPricing() {
+  document.getElementById('pricing-overlay').classList.add('open');
+}
+function closePricing() {
+  document.getElementById('pricing-overlay').classList.remove('open');
+}
+function closePricingOnBg(e) {
+  if (e.target === document.getElementById('pricing-overlay')) closePricing();
+}
+
+// ══════════════════════════════════════════════════
+//  TIER SYSTEM
+//  currentTier: 'free' | 'premium'
+//  Toggle with the button in the sidebar for demo purposes
+// ══════════════════════════════════════════════════
+let currentTier = 'free';
+
+const PREMIUM_TABS = ['tab-history','tab-revenue','tab-analytics','tab-feedback','tab-followup'];
+const LOCK_LABELS  = {
+  'tab-history':   { icon:'📅', title:'History Log',          desc:'Upgrade to Premium to access full daily patient records and dentist history.' },
+  'tab-revenue':   { icon:'💰', title:'Revenue Overview',     desc:'Upgrade to Premium to track total earnings, service breakdowns, and average billing.' },
+  'tab-analytics': { icon:'📊', title:'Analytics Dashboard',  desc:'Upgrade to Premium to see peak hours, patient retention, and monthly trends.' },
+  'tab-feedback':  { icon:'⭐', title:'Patient Feedback',      desc:'Upgrade to Premium to collect star ratings and comments from patients after each visit.' },
+  'tab-followup':  { icon:'📆', title:'Follow-up Scheduling', desc:'Upgrade to Premium to set recommended return dates for patients and track upcoming follow-ups.' },
+};
+
+function toggleTier() {
+  currentTier = currentTier === 'free' ? 'premium' : 'free';
+  applyTierUI();
+  showToast(currentTier === 'premium' ? '⭐ Switched to Premium Plan' : '🔒 Switched to Free Plan');
+}
+
+function applyTierUI() {
+  const isPremium = currentTier === 'premium';
+
+  // Tier badge in sidebar
+  const badge = document.getElementById('tier-badge-wrap');
+  if (badge) {
+    badge.innerHTML = `
+      <div class="tier-badge ${isPremium ? 'premium' : 'free'}">
+        <div class="tier-dot ${isPremium ? 'premium' : 'free'}"></div>
+        ${isPremium ? '⭐ Premium Plan' : 'Starter Plan · Free'}
+      </div>`;
+  }
+
+  // Toggle button text
+  const toggleBtn = document.getElementById('btn-tier-toggle');
+  if (toggleBtn) {
+    toggleBtn.textContent = isPremium ? '🔽 Switch to Free Plan' : '⬆️ Switch to Premium';
+    toggleBtn.classList.toggle('is-premium', isPremium);
+  }
+
+  // Nav item locks
+  PREMIUM_TABS.forEach(tabId => {
+    const key    = tabId.replace('tab-','');
+    const navBtn = document.querySelector(`.nav-item[data-tab="${tabId}"]`);
+    const lockEl = document.getElementById(`nl-${key}`);
+    if (navBtn)  navBtn.classList.toggle('unlocked', isPremium);
+    if (lockEl)  lockEl.style.display = isPremium ? 'none' : '';
+  });
+
+  // Lock/unlock premium tab content
+  PREMIUM_TABS.forEach(tabId => {
+    const tabEl = document.getElementById(tabId);
+    if (!tabEl) return;
+    // Remove existing overlay first
+    const existing = tabEl.querySelector('.lock-overlay');
+    if (existing) existing.remove();
+
+    if (!isPremium) {
+      const info = LOCK_LABELS[tabId];
+      const overlay = document.createElement('div');
+      overlay.className = 'lock-overlay';
+      overlay.innerHTML = `
+        <div class="lock-icon">${info.icon}</div>
+        <div class="lock-title">${info.title}</div>
+        <p class="lock-desc">${info.desc}</p>
+        <button class="btn btn-gold" onclick="openPricing()">💎 View Premium Plans</button>`;
+      tabEl.appendChild(overlay);
+    }
+  });
+
+  // If currently on a premium tab and switched to free — jump back to queue
+  const activeTab = document.querySelector('.tab.active');
+  if (!isPremium && activeTab && PREMIUM_TABS.includes(activeTab.id)) {
+    const queueBtn = document.querySelector('.nav-item[data-tab="tab-queue"]');
+    if (queueBtn) switchTab(queueBtn, 'tab-queue');
+  }
+}
+
+
 let _tt;
 function showToast(msg) {
   const t = document.getElementById('toast');
