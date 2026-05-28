@@ -29,7 +29,11 @@ const SERVICES = [
   { id:'s8', name:'Wisdom Tooth Extraction', icon:'💎', price:8000,  priceDisplay:'₱8,000–₱15,000', fixed:false, durMin:90,  durMax:120, note:'Final price depends on case complexity.' },
 ];
  
-const ADMIN_CREDS  = { username:'admin', password:'dentis2024' };
+const STAFF_ACCOUNTS = [
+  { username: 'admin',      password: 'dentis2026', role: 'Owner' },
+  { username: 'reception',  password: 'front2026',  role: 'Receptionist' },
+  { username: 'chrisrocero',  password: 'ampogiko',  role: 'Programmer' },
+];
 const CLINIC_OPEN  = 8;
 const CLINIC_CLOSE = 16;  // 4 PM closing time
  
@@ -910,7 +914,8 @@ function adminLogin() {
   const u = document.getElementById('a-user').value.trim();
   const p = document.getElementById('a-pass').value;
   const e = document.getElementById('a-err');
-  if (u===ADMIN_CREDS.username && p===ADMIN_CREDS.password) {
+  const match = STAFF_ACCOUNTS.find(a => a.username === u && a.password === p);
+  if (match) {
     e.textContent=''; document.getElementById('a-user').value=''; document.getElementById('a-pass').value='';
     showPage('page-admin-dashboard');
   } else { e.textContent='Invalid username or password.'; document.getElementById('a-pass').value=''; }
