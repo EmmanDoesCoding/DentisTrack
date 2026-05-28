@@ -30,9 +30,9 @@ const SERVICES = [
 ];
  
 const STAFF_ACCOUNTS = [
-  { username: 'admin',      password: 'dentis2026', role: 'Owner' },
-  { username: 'reception',  password: 'front2026',  role: 'Receptionist' },
-  { username: 'chrisrocero',  password: 'ampogiko',  role: 'Programmer' },
+  { username:'admin',      password:'dentis2026', role:'Owner'        },
+  { username:'reception',  password:'front2026',  role:'Receptionist' },
+  { username:'chrisrocero',password:'ampogiko',   role:'Programmer'   },
 ];
 const CLINIC_OPEN  = 8;
 const CLINIC_CLOSE = 16;  // 4 PM closing time
@@ -375,7 +375,7 @@ async function patientSignIn() {
     try {
       const res  = await fetch(JSONBIN_URL + '/latest', { headers: { 'X-Master-Key': JSONBIN_KEY } });
       const json = await res.json();
-      if (json.record?.nextId) { applyData(json.record); lsCacheWrite(); }
+      if (json.record?.nextId) { applyData(json.record); }
     } catch(e) { /* use cached data */ }
   }
  
@@ -439,7 +439,7 @@ async function patientRegister() {
     try {
       const res  = await fetch(JSONBIN_URL + '/latest', { headers: { 'X-Master-Key': JSONBIN_KEY } });
       const json = await res.json();
-      if (json.record?.nextId) { applyData(json.record); lsCacheWrite(); }
+      if (json.record?.nextId) { applyData(json.record); }
     } catch(e) { /* use cache */ }
   }
  
@@ -769,12 +769,33 @@ async function patientJoinQueue() {
   if (!time)               { showToast('Please select a time slot.');   return; }
   if (selectedSvcs.size===0) { showToast('Please select at least one service.'); return; }
  
+  // ── FREE TIER LIMIT: 5 patients per day ───────────
+  if (currentTier !== 'premium') {
+    const FREE_DAILY_LIMIT = 5;
+    const bookedOnDate = [
+      ...S.queue.filter(p => p.date === date),
+      ...S.completed.filter(p => p.date === date),
+    ].length;
+    if (bookedOnDate >= FREE_DAILY_LIMIT) {
+      showToast(`⚠️ Free plan limit reached for ${formatDate(date)}.`);
+      // Show a more detailed message in the slot info
+      const infoEl = document.getElementById('pd-slot-info');
+      if (infoEl) {
+        infoEl.className = 'slot-info err';
+        infoEl.style.display = 'block';
+        infoEl.textContent = `🔒 The Free Plan allows up to ${FREE_DAILY_LIMIT} patients per day. ${formatDate(date)} is fully booked under the free tier. Please choose another date or upgrade to Premium for unlimited bookings.`;
+      }
+      return;
+    }
+  }
+  // ─────────────────────────────────────────────────
+ 
   // Pull latest data before booking to avoid race conditions across devices
   if (_syncOnline) {
     try {
       const res  = await fetch(JSONBIN_URL + '/latest', { headers: { 'X-Master-Key': JSONBIN_KEY } });
       const json = await res.json();
-      if (json.record?.nextId) { applyData(json.record); lsCacheWrite(); }
+      if (json.record?.nextId) { applyData(json.record); }
     } catch(e) { /* proceed with cache */ }
   }
  
@@ -916,9 +937,15 @@ function adminLogin() {
   const e = document.getElementById('a-err');
   const match = STAFF_ACCOUNTS.find(a => a.username === u && a.password === p);
   if (match) {
-    e.textContent=''; document.getElementById('a-user').value=''; document.getElementById('a-pass').value='';
+    e.textContent = '';
+    document.getElementById('a-user').value = '';
+    document.getElementById('a-pass').value = '';
     showPage('page-admin-dashboard');
-  } else { e.textContent='Invalid username or password.'; document.getElementById('a-pass').value=''; }
+    showToast(`Welcome, ${match.username} (${match.role})! 👋`);
+  } else {
+    e.textContent = 'Invalid username or password.';
+    document.getElementById('a-pass').value = '';
+  }
 }
 function adminLogout() { stopPolling(); showPage('page-landing'); }
  
